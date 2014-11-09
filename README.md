@@ -1,7 +1,7 @@
 Compilador
 ==========
 
-Compilador feito através do uso do LEX e do YACC para estudo e compreensão de compilação de uma linguagem criada.
+Compilador feito através do uso do LEX e do YACC para estudo e compreensão de compilação de uma linguagem criada para a linguagem C-assembly uma linguagem que nos lembra o assembly com algumas facilitações.
 
 
 Requisitos Funcionais:
@@ -45,23 +45,23 @@ Pipes:
 
 17) sort[ x ]
 
-
 18) split[ x > 6 ]( a, b )
 
 19) merge( a, b )[ x == y ]
 
 
 C-Assembly
-C-Assembly: c apenas com 
-1) if/goto, sem blocos
-2) Funções
-3) Parâmetros
-4) Arrays unidimensionais
-5) tipos int, long, char, float e double
-6) Expressões com uma atribuição e um dos operadores a seguir:
-   + - * / % < > = == != || && ! | & ^ ~
-7) Uso de array: apenas um array por atribuição, sem outro operador
-ex: a = m[x];
-8) Chamadas de função: apenas variáveis ou valores, sem expressões como parâmetros. 
-Ex: a = f(9,x,y);
-9) Variáveis local e global.
+
+C-Assembly: c apenas com:
+  1) if/goto, sem blocos
+  2) Funções
+  3) Parâmetros
+  4) Arrays unidimensionais
+  5) tipos int, long, char, float e double
+  6) Expressões com uma atribuição e um dos operadores a seguir:
+     + - * / % < > = == != || && ! | & ^ ~
+  7) Uso de array: apenas um array por atribuição, sem outro operador
+  ex: a = m[x];
+  8) Chamadas de função: apenas variáveis ou valores, sem expressões como parâmetros.
+  Ex: a = f(9,x,y);
+  9) Variáveis local e global.
