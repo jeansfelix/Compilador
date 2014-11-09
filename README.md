@@ -3,8 +3,8 @@ Compilador
 
 Compilador feito através do uso do LEX e do YACC para estudo e compreensão de compilação de uma linguagem criada para a linguagem C-Assembly uma linguagem que nos lembra o assembly com algumas facilitações.
 
+<h4>Requisitos Funcionais:</h4>
 
-Requisitos Funcionais:
 
 1) Tipos: int, char, boolean, float, double, string
 
@@ -30,10 +30,9 @@ Requisitos Funcionais:
 
 11) Operadores básicos: ( ) + - / * % && || ! > < >=
 
+<h4>Pipes:</h4>
 
-Pipes:
-
-12) intervalo: [ 0 .. 10 ] 
+12) intervalo: [ 0 .. 10 ]
 
 13) filter[ x % 2 == 0 ]
 
@@ -45,24 +44,30 @@ Pipes:
 
 17) sort[ x ]
 
-18) split[ x > 6 ]( a, b )
+18) split x > 6
 
 19) merge( a, b )[ x == y ]
 
 
-C-Assembly
+<h4>C-Assembly</h4>
 
-C-Assembly: C apenas com:
+<b>C-Assembly é C padronizado desta forma:</b>
 
-  1) Comando if/goto, sem blocos,
-  2) Funções,
-  3) Parâmetros,
-  4) Arrays unidimensionais,
-  5) Tipos: int, long, char, float e double,
-  6) Expressões com uma atribuição e um dos operadores a seguir:
-      + - * / % < > = == != || && ! | & ^ ~
-  7) Uso de array: apenas um array por atribuição sem outro operador,
-      a = m[x];
-  8) Chamadas de função: sem expressões como parâmetros, apenas variáveis ou valores,
-  9) Variáveis local e global.
-  
+1) Comando if/goto, sem blocos,
+
+2) Funções,
+
+3) Parâmetros,
+
+4) Arrays unidimensionais,
+
+5) Tipos: int, long, char, float e double,
+
+6) Expressões com uma atribuição e um dos operadores a seguir:
+  + - * / % < > = == != || && ! | & ^ ~
+
+7) Uso de array: apenas um array por atribuição sem outro operador, a = m[x];
+
+8) Chamadas de função: sem expressões como parâmetros, apenas variáveis ou valores,
+
+9) Variáveis local e global.
