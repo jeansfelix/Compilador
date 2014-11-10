@@ -10,18 +10,21 @@ struct Atributo {
   string v;  // Valor
   string t;  // Tipo
   string c;  // Codigo
+  string label;
   
   Atributo() {}  // inicializacao automatica para vazio ""
-  Atributo( string v, string t = "", string c = "" ) {
+  Atributo( string v, string t = "", string c = "", string label = "") {
     this->v = v;
     this->t = t;
     this->c = c;
+    this->label = label;
   }
 };
 
 void gerarCodigo_EXPNUM(Atributo *atr, Atributo *atr1 , string oper, Atributo *atr2);
 
-string geraTemp();
+string gerarLabel();
+string gerarTemp();
 
 #define YYSTYPE Atributo
 
@@ -37,22 +40,26 @@ void yyerror(const char *);
 
 %%
 
-S : ATR ';' { cout << $1.c << endl; }
-  | COMANDOS { cout << $1.c << endl; }
+S : ATR ';' { cout << $$.c << endl; }
+  | COMANDOS { cout << $$.c << endl; }
   | S S
   | /* epsylon */
   ;
 
-BLOCO_IF : '{' S '}' {$$.c = "{\n" + $2.c + "}";}
+BLOCO_IF : '{' ATR ';' '}' {$$.c = "\n" + $2.c + "\n";}
+         | '{' COMANDOS '}' {$$.c = "\n" + $2.c + "\n";}
          ;
 
 COMANDOS : CMD_IF { $$ = $1; }
          ;
 
-CMD_IF : _IF '(' _BOOL ')' BLOCO_IF {$$.c = $1.c + $1.v + " ( " + $3.v + " ) " + $5.c; }
+CMD_IF : _IF '(' _BOOL ')' BLOCO_IF { $$.label = gerarLabel(); $$.t = gerarTemp();
+                                      $$.c = $$.t + " = " + "!" + $3.v + ";\n" + $1.v + " ( " + $$.t + " ) " + "goto " + 
+                                      $$.label + $5.c + $3.c + $$.label + ":\n";
+                                    }
        ;
 
-ATR : _ID '=' EXP_NUM { $$.c = $3.c + $1.v + " = " + $3.v + ";\n"; }
+ATR : _ID '=' EXP_NUM { $$.c = $3.c + $1.v + " = " + $3.v + ";\n"; } 
     ;
 
 EXP_NUM : EXP_NUM '+' EXP_NUM  { gerarCodigo_EXPNUM(&$$, &$1 , "+", &$3); }
@@ -94,15 +101,15 @@ void yyerror( const char* st )
 
 void gerarCodigo_EXPNUM(Atributo *atr, Atributo *atr1 , string oper, Atributo *atr2) 
 {
-  atr->v = geraTemp(); atr->c = atr1->c + atr2->c + atr->v + " = " + atr1->v + " " + oper + " " + atr2->v + ";\n";
+  atr->v = gerarTemp(); atr->c = atr1->c + atr2->c + atr->v + " = " + atr1->v + " " + oper + " " + atr2->v + ";\n";
 }
 
-string geraTemp()
+string gerarTemp()
 {
   return "temp_" + toStr( ++n_var_temp );
 }
 
-string geraLabel()
+string gerarLabel()
 {
   return "LABEL_" + toStr( ++n_label_temp );
 }
