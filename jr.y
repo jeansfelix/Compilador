@@ -64,6 +64,12 @@ CMD_IF : _IF '(' _BOOL ')' BLOCO_IF { $$.label = gerarLabel(); $$.t = gerarTemp(
 /* IDEIA: for (i=0; i<=5; i=i+1 ){ //codigo qualquer }*/
 CMD_FOR : "for" '(' ATR ';' _BOOL ';' EXP_NUM ')' BLOCO_IF
 	;
+/* IDEIA: while(true){ //codigo qualquer } */
+CMD_WHILE : "while" '(' _BOOL ')' BLOCO_IF
+	  ;
+
+CMD_DOWHILE : "do" BLOCO_IF "while" '(' _BOOL ')' ';'
+	    ;
 
 ATR : _ID '=' EXP_NUM { $$.c = $3.c + $1.v + " = " + $3.v + ";\n"; } 
     ;
