@@ -34,7 +34,7 @@ void yyerror(const char *);
 %}
 
 %token _C_INT _C_CHAR _C_DOUBLE _C_STRING _C_BOOL 
-%token _TK_ID _TK_IF _TK_FOR _TK_WHILE _TK_DO
+%token _TK_ID _TK_IF _TK_FOR _TK_WHILE _TK_DO _TK_SWITCH _TK_CASE _TK_BREAK _TK_DEFAULT
 
 %nonassoc '<' '>'
 %left '+' '-'
@@ -45,7 +45,9 @@ void yyerror(const char *);
 S0 : S { cout << $$.c << endl; }
    ;
 
-S : ATR ';' S { $$.c = $1.c + $3.c; }
+S : VAR_ARRAY
+  | VAR
+  | ATR ';' S { $$.c = $1.c + $3.c; }
   | COMANDO S { $$.c = $1.c + $2.c; }
   | /* epsylon */  { $$.c = ""; }
   ;
@@ -57,6 +59,7 @@ COMANDO : CMD_IF
         | CMD_FOR
         | CMD_WHILE
         | CMD_DOWHILE
+	| CMD_SWITCH
         ;
 
 /*if (a == b) { //codigo qualquer }  */
@@ -75,6 +78,31 @@ CMD_WHILE : _TK_WHILE '(' EXP ')' BLOCO
 
 CMD_DOWHILE : _TK_DO BLOCO _TK_WHILE '(' EXP ')' ';'
 	    ;
+
+CMD_SWITCH : _TK_SWITCH '(' _TK_ID ')' '{' CMD_CASE '}'
+	   ;
+/* Fiquei na duvida aqui. Acho que devíamos aceitar apenas o NUM */
+CMD_CASE : _TK_CASE  _TK_ID ':' BLOCO_CASE
+	 | _TK_CASE  _C_INT ':' BLOCO_CASE
+	 | _TK_CASE  _C_DOUBLE ':' BLOCO_CASE
+	 | _TK_DEFAULT ':' BLOCO_CASE
+	 | /* epsylon */
+	 ;
+
+BLOCO_CASE : S _TK_BREAK ';' CMD_CASE
+	   | _TK_BREAK ';' CMD_CASE
+	   ;
+
+/* Criei essa regra, mas não tenho certeza se ela será necessária */
+VAR : _TK_ID
+    ;
+
+VAR_ARRAY : _TK_ID ARRAY ';'
+	  ;
+
+ARRAY : '[' _C_INT ']'
+      |'[' _C_INT ']' '[' _C_INT ']'
+      ;
 
 ATR : _TK_ID '=' EXP { $$.c = $1.c + $3.c + $1.v + " = " + $3.v + ";\n"; }
     ;

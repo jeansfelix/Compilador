@@ -1,4 +1,4 @@
-a = 10;
+a = (a + b) * (1.5 + 10 * x);
 
 switch (a) {
     case 5:
@@ -7,4 +7,3 @@ switch (a) {
 	a = 10+10;
 	break;
 }
-
