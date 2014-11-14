@@ -33,9 +33,11 @@ int yyparse();
 void yyerror(const char *);
 %}
 
-%token _C_INT _C_CHAR _C_DOUBLE _C_STRING _C_BOOL 
-%token _TK_ID _TK_IF _TK_FOR _TK_WHILE _TK_DO _TK_SWITCH _TK_CASE _TK_BREAK _TK_DEFAULT
+%token _C_INT _C_CHAR _C_DOUBLE _C_STRING _C_BOOL
+%token _TK_ID _TK_IF _TK_ELSE _TK_FOR _TK_WHILE _TK_DO _TK_SWITCH _TK_CASE _TK_BREAK _TK_DEFAULT
 
+%nonassoc _PRECEDENCIA_ELSE
+%nonassoc _TK_ELSE
 %nonassoc '<' '>'
 %left '+' '-'
 %left '*' '/'
@@ -45,81 +47,106 @@ void yyerror(const char *);
 S0 : S { cout << $$.c << endl; }
    ;
 
-S : VAR_ARRAY
-  | VAR
-  | ATR ';' S { $$.c = $1.c + $3.c; }
-  | COMANDO S { $$.c = $1.c + $2.c; }
+S : DECLARAR_VAR ';'
+  | ATR ';' S 
+        { $$.c = $1.c + $3.c; }
+  | COMANDO S 
+        { $$.c = $1.c + $2.c; }
   | /* epsylon */  { $$.c = ""; }
   ;
 
-BLOCO : '{' S '}' {$$.c = "\n" + $2.c + "\n";}
+BLOCO : '{' S '}' {$$.c = "\n" + $2.c;}
       ;
-         
+
+BLOCO_OPCIONAL : BLOCO   
+                    { $$.c = $1.c; }
+               | ATR ';'
+                    { $$.c = $1.c; }
+               | COMANDO 
+                    { $$.c = $1.c; }
+               ;
+
 COMANDO : CMD_IF
         | CMD_FOR
         | CMD_WHILE
         | CMD_DOWHILE
-	| CMD_SWITCH
+	    | CMD_SWITCH
         ;
 
 /*if (a == b) { //codigo qualquer }  */
-CMD_IF : _TK_IF '(' EXP ')' BLOCO { $$.label = gerarLabel(); $$.t = gerarTemp();
-                                    $$.c = $$.t + " = " + "!" + $3.v + ";\n" + $1.v + " ( " + $$.t + " ) " + "goto " + 
-                                    $$.label + $5.c + $3.c + $$.label + ":\n";
+CMD_IF : _TK_IF '(' EXP ')' BLOCO_OPCIONAL  %prec _PRECEDENCIA_ELSE
+                                  { $$.label = gerarLabel(); $$.t = gerarTemp();
+                                    $$.c =  $3.c + $$.t + " = " + "!" + $3.v + ";\n" + $1.v + " ( " + $$.t + " ) " + "goto " + 
+                                    $$.label + $5.c + $$.label + ":";
+                                  }
+       | _TK_IF '(' EXP ')' BLOCO_OPCIONAL _TK_ELSE BLOCO_OPCIONAL
+                                  { $$.label = gerarLabel(); $$.t = gerarTemp();
+                                    $$.c =  $3.c + $$.t + " = " + "!" + $3.v + ";\n" + $1.v + " ( " + $$.t + " ) " + "goto " + 
+                                    $$.label + $5.c + $$.label + ":\n" + $7.c;
                                   }
        ;
 
 /* IDEIA: for (i=0; i<=5; i=i+1 ){ //codigo qualquer }*/
-CMD_FOR : _TK_FOR '(' ATR ';' EXP ';' EXP ')' BLOCO
+CMD_FOR : _TK_FOR '(' ATR ';' EXP ';' EXP ')' BLOCO_OPCIONAL
 	;
 /* IDEIA: while(true){ //codigo qualquer } */
-CMD_WHILE : _TK_WHILE '(' EXP ')' BLOCO
+CMD_WHILE : _TK_WHILE '(' EXP ')' BLOCO_OPCIONAL
 	  ;
 
 CMD_DOWHILE : _TK_DO BLOCO _TK_WHILE '(' EXP ')' ';'
 	    ;
 
-CMD_SWITCH : _TK_SWITCH '(' _TK_ID ')' '{' CMD_CASE '}'
+CMD_SWITCH : _TK_SWITCH '(' _TK_ID ')' '{' LST_CASE '}'
 	   ;
-/* Fiquei na duvida aqui. Acho que devíamos aceitar apenas o NUM */
-CMD_CASE : _TK_CASE  _TK_ID ':' BLOCO_CASE
-	 | _TK_CASE  _C_INT ':' BLOCO_CASE
-	 | _TK_CASE  _C_DOUBLE ':' BLOCO_CASE
-	 | _TK_DEFAULT ':' BLOCO_CASE
-	 | /* epsylon */
+
+LST_CASE : CASE LST_CASE
+         | _TK_DEFAULT ':' S _TK_BREAK ';'
+         | /* epsylon */
+         ;
+         
+CASE : _TK_CASE  _TK_ID    ':' BLOCO_CASE
+     | _TK_CASE  _C_INT    ':' BLOCO_CASE
+     | _TK_CASE  _C_CHAR   ':' BLOCO_CASE
+     | _TK_CASE  _C_STRING ':' BLOCO_CASE
 	 ;
 
-BLOCO_CASE : S _TK_BREAK ';' CMD_CASE
-	   | _TK_BREAK ';' CMD_CASE
-	   ;
+BLOCO_CASE : S _TK_BREAK ';'
+	       ;
 
-/* Criei essa regra, mas não tenho certeza se ela será necessária */
-VAR : _TK_ID
-    ;
+DECLARAR_VAR : VAR_ARRAY ';'
+             ;
 
-VAR_ARRAY : _TK_ID ARRAY ';'
-	  ;
+VAR_ARRAY : _TK_ID ARRAY
+	      ;
 
 ARRAY : '[' _C_INT ']'
-      |'[' _C_INT ']' '[' _C_INT ']'
+      | '[' _C_INT ']' '[' _C_INT ']'
       ;
 
-ATR : _TK_ID '=' EXP { $$.c = $1.c + $3.c + $1.v + " = " + $3.v + ";\n"; }
+ATR : _TK_ID '=' EXP 
+            { $$.c = $1.c + $3.c + $1.v + " = " + $3.v + ";\n"; }
     ;
 
-EXP : EXP '+' EXP  { gerarCodigo_EXP(&$$, $1 , $2, $3); }
-    | EXP '-' EXP  { gerarCodigo_EXP(&$$, $1 , $2, $3); }
-    | EXP '*' EXP  { gerarCodigo_EXP(&$$, $1 , $2, $3); }
-    | EXP '/' EXP  { gerarCodigo_EXP(&$$, $1 , $2, $3); }
-    | EXP '>' EXP  { gerarCodigo_EXP(&$$, $1 , $2, $3); }
-    | EXP '<' EXP  { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+EXP : EXP '+' EXP  
+            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+    | EXP '-' EXP 
+            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+    | EXP '*' EXP  
+            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+    | EXP '/' EXP  
+            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+    | EXP '>' EXP  
+            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+    | EXP '<' EXP  
+            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
     | F
     ;
 
-F : _TK_ID		
-  | _C_INT    
-  | _C_DOUBLE 
+F : _TK_ID
+  | _C_INT 
+  | _C_DOUBLE
   | _C_BOOL
+  | _C_STRING
   | '(' EXP ')'  { $$ = $2; }
   ;
 

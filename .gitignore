@@ -28,6 +28,7 @@
 *.app
 
 # Arquivos gerados
+*.yy.c
+*.tab.c
 jr
-lex.yy.c
-y.tab.c
+
