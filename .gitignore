@@ -30,6 +30,7 @@
 # Arquivos gerados
 *.yy.c
 *.tab.c
+*.output
 jr
 
-*.output
+

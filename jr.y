@@ -55,8 +55,8 @@ void yyerror(const char *);
 S0 : LST_FUNC { cout << $$.c << endl; }
    ;
 
-LST_FUNC : TIPO _TK_ID '(' LST_ARGUMENTOS ')' BLOCO
-                    { $$.c = $1.c + " " + $2.v + $3.v + $4.c + $5.v + "\n{" + $6.c + "}\n"; }
+LST_FUNC : TIPO _TK_ID '(' LST_ARGUMENTOS ')' BLOCO LST_FUNC
+                    { $$.c = $1.c + " " + $2.v + $3.v + $4.c + $5.v + "\n{" + $6.c + "}\n" + $7.c; }
          | /* epsylon */
                     { $$.c = ""; }
          ;

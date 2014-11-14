@@ -1,3 +1,9 @@
+void escreveLetra(int a, string c) 
+{
+    a = c;
+}
+
+
 int main(int argc, char argv)
 {
     vetor[12] = a;
