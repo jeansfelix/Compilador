@@ -1,10 +1,7 @@
 a = 10;
 
-switch (a) {
-    case 5:
-	break;
-    case 10:
-	a = 10+10;
-	break;
+for ( a=2 ; a < 3 ; a = a + 1) 
+{
+    b = 1;
 }
 

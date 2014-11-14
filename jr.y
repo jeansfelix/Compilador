@@ -22,6 +22,7 @@ struct Atributo {
 };
 
 void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3);
+void gerarCodigo_EXP_UNARIA(Atributo *atr, Atributo atr1 , Atributo atr2);
 
 string gerarLabel();
 string gerarTemp();
@@ -34,19 +35,39 @@ void yyerror(const char *);
 %}
 
 %token _C_INT _C_CHAR _C_DOUBLE _C_STRING _C_BOOL _C_FLOAT
-%token _TK_ID _TK_IF _TK_ELSE _TK_FOR _TK_WHILE _TK_DO _TK_SWITCH _TK_CASE _TK_BREAK _TK_DEFAULT
-%token _TK_INT _TK_CHAR _TK_DOUBLE _TK_STRING _TK_BOOL _TK_FLOAT
+%token _TK_ID _TK_IF _TK_ELSE _TK_FOR _TK_WHILE _TK_DO _TK_SWITCH _TK_CASE _TK_BREAK _TK_DEFAULT _TK_RETURN
+%token _TK_INT _TK_CHAR _TK_DOUBLE _TK_STRING _TK_BOOL _TK_FLOAT _TK_VOID
+%token _OP_NOT _OP_EQUAL _OP_DIF _OP_LESS_OR_EQUAL _OP_GREATER_OR_EQUAL _OP_INC _OP_DEC _OP_OR _OP_AND
 
 %nonassoc _PRECEDENCIA_ELSE
 %nonassoc _TK_ELSE
+%nonassoc _OP_NOT _OP_EQUAL _OP_DIF _OP_LESS_OR_EQUAL _OP_GREATER_OR_EQUAL 
 %nonassoc '<' '>'
+%left _OP_OR
+%left _OP_AND
 %left '+' '-'
 %left '*' '/'
+%left _OP_INC _OP_DEC
+%left '%'
 
 %%
 
-S0 : S { cout << $$.c << endl; }
+S0 : LST_FUNC { cout << $$.c << endl; }
    ;
+
+LST_FUNC : TIPO _TK_ID '(' LST_ARGUMENTOS ')' BLOCO
+                    { $$.c = $1.c + " " + $2.v + $3.v + $4.c + $5.v + "\n{" + $6.c + "}\n"; }
+         | /* epsylon */
+                    { $$.c = ""; }
+         ;
+
+LST_ARGUMENTOS : TIPO _TK_ID ',' LST_ARGUMENTOS 
+                    { $$.c = $1.c + " " + $2.v + $3.v + " " + $4.c; }
+               | TIPO _TK_ID
+                    { $$.c = $1.c + " " + $2.v; }
+               | /* epsylon */
+                    { $$.c = ""; }
+               ;
 
 S : VAR ';' S 
         { $$.c = $1.c + $3.c; }
@@ -56,7 +77,8 @@ S : VAR ';' S
         { $$.c = $1.c + $3.c; }
   | COMANDO S 
         { $$.c = $1.c + $2.c; }
-  | /* epsylon */  { $$.c = ""; }
+  | /* epsylon */
+        { $$.c = ""; }
   ;
 
 BLOCO : '{' S '}' {$$.c = "\n" + $2.c;}
@@ -75,7 +97,13 @@ COMANDO : CMD_IF
         | CMD_WHILE
         | CMD_DOWHILE
         | CMD_SWITCH
+        | CMD_RETURN
         ;
+
+/* return 5 */
+CMD_RETURN : _TK_RETURN F ';'
+           | _TK_RETURN ';'
+           ;
 
 /*if (a == b) { //codigo qualquer }  */
 CMD_IF : _TK_IF '(' EXP ')' BLOCO_OPCIONAL  %prec _PRECEDENCIA_ELSE
@@ -91,7 +119,7 @@ CMD_IF : _TK_IF '(' EXP ')' BLOCO_OPCIONAL  %prec _PRECEDENCIA_ELSE
        ;
 
 /* IDEIA: for (i=0; i<=5; i=i+1 ){ //codigo qualquer }*/
-CMD_FOR : _TK_FOR '(' ATR ';' EXP ';' EXP ')' BLOCO_OPCIONAL
+CMD_FOR : _TK_FOR '(' ATR ';' EXP ';' ATR ')' BLOCO_OPCIONAL
         ;
 /* IDEIA: while(true){ //codigo qualquer } */
 CMD_WHILE : _TK_WHILE '(' EXP ')' BLOCO_OPCIONAL
@@ -106,6 +134,7 @@ CMD_SWITCH : _TK_SWITCH '(' _TK_ID ')' '{' LST_CASE '}'
 LST_CASE : CASE LST_CASE
          | _TK_DEFAULT ':' S _TK_BREAK ';'
          | /* epsylon */
+                { $$.c = ""; }
          ;
          
 CASE : _TK_CASE  _TK_ID    ':' BLOCO_CASE
@@ -121,23 +150,28 @@ VAR : VAR ',' _TK_ID
     | TIPO _TK_ID
     ;
     
-TIPO : _TK_INT
-     | _TK_CHAR
-     | _TK_BOOL
-     | _TK_DOUBLE
-     | _TK_FLOAT
-     | _TK_STRING
+TIPO : _TK_INT      { $$.c = $1.v; }
+     | _TK_CHAR     { $$.c = $1.v; }
+     | _TK_BOOL     { $$.c = $1.v; }
+     | _TK_DOUBLE   { $$.c = $1.v; }
+     | _TK_FLOAT    { $$.c = $1.v; }
+     | _TK_STRING   { $$.c = $1.v; }
+     | _TK_VOID     { $$.c = $1.v; }
      ;
      
-VAR_ARRAY : TIPO '[' ']' _TK_ID  ARRAY
+VAR_ARRAY : TIPO '[' ']' _TK_ID ARRAY
           ;
 
 ARRAY : '[' _C_INT ']' ARRAY
+             { $$.c = $2.v ;}
       | /* epsylon */
+             { $$.c = ""; }
       ;
 
 ATR : _TK_ID '=' EXP 
-            { $$.c = $1.c + $3.c + $1.v + " = " + $3.v + ";\n"; }
+            { $$.c = $3.c + $1.v + " = " + $3.v + ";\n"; }
+    | _TK_ID '[' EXP ']' '=' EXP 
+            { $$.c = $6.c + $3.c + $1.v + $2.v + $3.v + $4.v + $3.c + " = " + $6.v + ";\n"; }
     ;
 
 EXP : EXP '+' EXP  
@@ -148,12 +182,42 @@ EXP : EXP '+' EXP
             { gerarCodigo_EXP(&$$, $1 , $2, $3); }
     | EXP '/' EXP  
             { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+    | EXP '%' EXP  
+            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
     | EXP '>' EXP  
             { gerarCodigo_EXP(&$$, $1 , $2, $3); }
     | EXP '<' EXP  
             { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+    | EXP _OP_EQUAL EXP  
+            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+    | EXP _OP_DIF EXP  
+            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+    | EXP _OP_LESS_OR_EQUAL EXP
+            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+    | EXP _OP_GREATER_OR_EQUAL EXP  
+            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+    | EXP _OP_OR EXP  
+            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+    | EXP _OP_AND EXP  
+            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+    | EXP_UNARIA
+            { $$.c = $1.c; }
+    | _TK_ID '[' INDICE ']'
+            { $$.v = gerarTemp(); $$.c = $1.v + $2.v + $3.v +  $4.v + "\n"; }
     | F
     ;
+    
+INDICE : EXP ',' INDICE
+       | EXP
+       ;
+           
+EXP_UNARIA : _OP_INC EXP
+                { gerarCodigo_EXP_UNARIA(&$$, $1, $2); }
+           | _OP_DEC EXP
+                { gerarCodigo_EXP_UNARIA(&$$, $1, $2); }
+           | _OP_NOT EXP
+                { gerarCodigo_EXP_UNARIA(&$$, $1, $2); }
+           ;
 
 F : _TK_ID
   | _C_INT 
@@ -191,6 +255,12 @@ void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3
 {
   atr->v = gerarTemp();
   atr->c = atr1.c + atr3.c + atr->v + " = " + atr1.v + " " + atr2.v + " " + atr3.v + ";\n";
+}
+
+void gerarCodigo_EXP_UNARIA(Atributo *atr, Atributo atr1 , Atributo atr2) 
+{
+  atr->v = gerarTemp(); 
+  atr->c = atr2.c + atr->v + " = " + atr1.v + atr2.v + ";\n";
 }
 
 string gerarTemp()
