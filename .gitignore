@@ -32,3 +32,4 @@
 *.tab.c
 jr
 
+*.output
