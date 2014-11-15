@@ -35,9 +35,10 @@ void yyerror(const char *);
 %}
 
 %token _C_INT _C_CHAR _C_DOUBLE _C_STRING _C_BOOL _C_FLOAT
-%token _TK_ID _TK_IF _TK_ELSE _TK_FOR _TK_WHILE _TK_DO _TK_SWITCH _TK_CASE _TK_BREAK _TK_DEFAULT _TK_RETURN
+%token _TK_ID _TK_IF _TK_ELSE _TK_FOR _TK_WHILE _TK_DO _TK_SWITCH _TK_CASE _TK_BREAK _TK_DEFAULT _TK_RETURN _TK_GLOBAL
 %token _TK_INT _TK_CHAR _TK_DOUBLE _TK_STRING _TK_BOOL _TK_FLOAT _TK_VOID
 %token _OP_NOT _OP_EQUAL _OP_DIF _OP_LESS_OR_EQUAL _OP_GREATER_OR_EQUAL _OP_INC _OP_DEC _OP_OR _OP_AND
+%token _IO_PRINT _IO_SCAN
 
 %nonassoc _PRECEDENCIA_ELSE
 %nonassoc _TK_ELSE
@@ -52,9 +53,19 @@ void yyerror(const char *);
 
 %%
 
+/*
+Coloquei a chamada da variável global antes da chamada de função.
+Não sei se isso é o modo correto
+Tentei colocar GLOBAL_VAR LST_FUNC, mas ele parou de imprimir tudo
+*/
 S0 : LST_FUNC { cout << $$.c << endl; }
+   | GLOBAL_VAR S0
    ;
 
+/**
+* Funções
+**/
+/* int funcaoNome (int variavel, ...){  } */
 LST_FUNC : TIPO _TK_ID '(' LST_ARGUMENTOS ')' BLOCO LST_FUNC
                     { $$.c = $1.c + " " + $2.v + $3.v + $4.c + $5.v + "\n{" + $6.c + "}\n" + $7.c; }
          | /* epsylon */
@@ -77,10 +88,15 @@ S : VAR ';' S
         { $$.c = $1.c + $3.c; }
   | COMANDO S 
         { $$.c = $1.c + $2.c; }
+  | LEITURA
+  | ESCRITA
   | /* epsylon */
         { $$.c = ""; }
   ;
 
+/**
+* BLocos
+**/
 BLOCO : '{' S '}' {$$.c = "\n" + $2.c;}
       ;
 
@@ -92,6 +108,12 @@ BLOCO_OPCIONAL : BLOCO
                     { $$.c = $1.c; }
                ;
 
+BLOCO_CASE : S _TK_BREAK ';'
+	   | CASE
+	   ;
+/**
+* Comandos
+**/
 COMANDO : CMD_IF
         | CMD_FOR
         | CMD_WHILE
@@ -143,9 +165,6 @@ CASE : _TK_CASE  _TK_ID    ':' BLOCO_CASE
      | _TK_CASE  _C_STRING ':' BLOCO_CASE
      ;
 
-BLOCO_CASE : S _TK_BREAK ';'
-           ;
-
 VAR : VAR ',' _TK_ID
     | TIPO _TK_ID
     ;
@@ -167,6 +186,15 @@ ARRAY : '[' _C_INT ']' ARRAY
       | /* epsylon */
              { $$.c = ""; }
       ;
+
+GLOBAL_VAR : _TK_GLOBAL '{' LST_GLOBAL_VAR '}' ';'
+	   ;
+
+LST_GLOBAL_VAR : VAR ';' LST_GLOBAL_VAR
+	       | VAR_ARRAY ';' LST_GLOBAL_VAR
+               | /* epsylon */
+                    { $$.c = ""; }
+               ;
 
 ATR : _TK_ID '=' EXP 
             { $$.c = $3.c + $1.v + " = " + $3.v + ";\n"; }
@@ -218,6 +246,19 @@ EXP_UNARIA : _OP_INC EXP
            | _OP_NOT EXP
                 { gerarCodigo_EXP_UNARIA(&$$, $1, $2); }
            ;
+
+/* Considerei aqui que ele pode imprimir qualquer coisa
+Adicionei o S para ele continuar a interpretar tudo, mas não sei se é a maneira correta.
+Sem o S não funcionou.
+ */
+ESCRITA : _IO_PRINT '(' F ')' ';' S
+	;
+			
+/* A ideia é poder realizar o scan e armazenar em uma variável 
+Adicionei o S pelo mesmo motivo do print
+*/
+LEITURA : _IO_SCAN '(' _TK_ID ')' ';' S
+	;
 
 F : _TK_ID
   | _C_INT 

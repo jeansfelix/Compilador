@@ -1,42 +1,37 @@
-void escreveLetra(int a, string c) 
-{
+global{
+	int a, b;
+	string c;
+};
+
+void escreveLetra(int a, string c) {
     a = c;
+    print(a);
+	scan(a);
 }
 
-
-int main(int argc, char argv)
-{
+int main(int argc, char argv){
     vetor[12] = a;
-
     a = a or b and c[a + b];
-    
     a = 1 + 3;
-        
     a = not c;
-    
     b = v equal c;
-
     c = 5 % ++f * 3 + 2 ;
     
     if ( a + b ) {
         a = a + b;
     }
-    else if (x)
-    {
+    else if (x){
        a = b;
     }
 
     a = 10;
 
-    for ( a=2 ; a < 3 ; a = a + 1) 
-    {
+    for ( a=2 ; a < 3 ; a = a + 1){
         b = 1;
     }
     
-    while (a == b) 
-    {
-        for ( a=2 ; a < 3 ; a = a + 1) 
-        {
+    while (a == b) {
+        for ( a=2 ; a < 3 ; a = a + 1){
             b = 1;
         }
     }
@@ -46,6 +41,7 @@ int main(int argc, char argv)
     }while (a == b);
 
     switch (a) {
+	case 2 :
         case 5 :
 		    break;
         case 10 : 
@@ -53,7 +49,7 @@ int main(int argc, char argv)
 		    a = 20 + 1;
 		    b = 1;
 		    break;
-	    default:
+        default:
 		    break;
     }
     

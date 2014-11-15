@@ -31,6 +31,7 @@ ID      {LETRA}({LETRA}|{NUMERO})*
     "break"    { yylval = Atributo( yytext ); return _TK_BREAK; }
     "default"  { yylval = Atributo( yytext ); return _TK_DEFAULT; }
     "return"   { yylval = Atributo( yytext ); return _TK_RETURN; }
+    "global"   { yylval = Atributo( yytext ); return _TK_GLOBAL; }
     
 %{ /* Tipos */ %}
     "int"       {  yylval = Atributo( yytext ); return _TK_INT; }
@@ -57,6 +58,10 @@ ID      {LETRA}({LETRA}|{NUMERO})*
     {INT}      { yylval = Atributo( yytext ); return _C_INT; }
     {DOUBLE}   { yylval = Atributo( yytext ); return _C_DOUBLE; }
     {STRING}   { yylval = Atributo( yytext ); return _C_STRING; }
+
+%{ /* IO */ %}
+    "print" {yylval = Atributo( yytext ); return _IO_PRINT;}
+    "scan"  {yylval = Atributo( yytext ); return _IO_SCAN;}
 
 %{ /* Identificadores */ %}
     {ID}       { yylval = Atributo( yytext ); return _TK_ID; }
