@@ -8,6 +8,7 @@ void escreveLetra(int a, string c) {
     print(a);
     scan(a);
     soma(a+b);
+    int[] arrayTeste[10][20];
 }
 
 int main(int argc, char argv){

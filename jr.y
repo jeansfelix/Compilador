@@ -194,8 +194,7 @@ LST_GLOBAL_VAR : VAR ';' LST_GLOBAL_VAR
 
 ATR : _TK_ID '=' EXP 
             { $$.c = $3.c + $1.v + " = " + $3.v + ";\n"; }
-    | _TK_ID '[' EXP ']' '=' EXP 
-            { $$.c = $6.c + $3.c + $1.v + $2.v + $3.v + $4.v + $3.c + " = " + $6.v + ";\n"; }
+    | _TK_ID ARRAY '=' EXP
     | _TK_ID '=' CHAMA_FUNC
     ;
 
