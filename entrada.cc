@@ -6,7 +6,8 @@ global{
 void escreveLetra(int a, string c) {
     a = c;
     print(a);
-	scan(a);
+    scan(a);
+    soma(a+b);
 }
 
 int main(int argc, char argv){

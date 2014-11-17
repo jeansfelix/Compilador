@@ -53,19 +53,9 @@ void yyerror(const char *);
 
 %%
 
-/*
-Coloquei a chamada da variável global antes da chamada de função.
-Não sei se isso é o modo correto
-Tentei colocar GLOBAL_VAR LST_FUNC, mas ele parou de imprimir tudo
-*/
-S0 : LST_FUNC { cout << $$.c << endl; }
-   | GLOBAL_VAR S0
+S0 : GLOBAL_VAR LST_FUNC { cout << $$.c << endl; }
    ;
 
-/**
-* Funções
-**/
-/* int funcaoNome (int variavel, ...){  } */
 LST_FUNC : TIPO _TK_ID '(' LST_ARGUMENTOS ')' BLOCO LST_FUNC
                     { $$.c = $1.c + " " + $2.v + $3.v + $4.c + $5.v + "\n{" + $6.c + "}\n" + $7.c; }
          | /* epsylon */
@@ -80,6 +70,17 @@ LST_ARGUMENTOS : TIPO _TK_ID ',' LST_ARGUMENTOS
                     { $$.c = ""; }
                ;
 
+CHAMA_FUNC : _TK_ID '(' LST_CHAMA_FUNC ')'
+	   ;
+
+LST_CHAMA_FUNC : _TK_ID ',' LST_CHAMA_FUNC 
+	       | EXP ',' LST_CHAMA_FUNC 
+               | _TK_ID
+	       | EXP
+               | /* epsylon */
+                    { $$.c = ""; }
+               ;
+
 S : VAR ';' S 
         { $$.c = $1.c + $3.c; }
   | VAR_ARRAY ';' S
@@ -88,15 +89,10 @@ S : VAR ';' S
         { $$.c = $1.c + $3.c; }
   | COMANDO S 
         { $$.c = $1.c + $2.c; }
-  | LEITURA
-  | ESCRITA
   | /* epsylon */
         { $$.c = ""; }
   ;
 
-/**
-* BLocos
-**/
 BLOCO : '{' S '}' {$$.c = "\n" + $2.c;}
       ;
 
@@ -111,23 +107,22 @@ BLOCO_OPCIONAL : BLOCO
 BLOCO_CASE : S _TK_BREAK ';'
 	   | CASE
 	   ;
-/**
-* Comandos
-**/
+
 COMANDO : CMD_IF
         | CMD_FOR
         | CMD_WHILE
         | CMD_DOWHILE
         | CMD_SWITCH
         | CMD_RETURN
+  	| CMD_LEITURA
+	| CMD_ESCRITA
+	| CHAMA_FUNC ';'
         ;
 
-/* return 5 */
 CMD_RETURN : _TK_RETURN F ';'
            | _TK_RETURN ';'
            ;
 
-/*if (a == b) { //codigo qualquer }  */
 CMD_IF : _TK_IF '(' EXP ')' BLOCO_OPCIONAL  %prec _PRECEDENCIA_ELSE
                                   { $$.label = gerarLabel(); $$.t = gerarTemp();
                                     $$.c =  $3.c + $$.t + " = " + "!" + $3.v + ";\n" + $1.v + " ( " + $$.t + " ) " + "goto " + 
@@ -140,10 +135,9 @@ CMD_IF : _TK_IF '(' EXP ')' BLOCO_OPCIONAL  %prec _PRECEDENCIA_ELSE
                                   }
        ;
 
-/* IDEIA: for (i=0; i<=5; i=i+1 ){ //codigo qualquer }*/
 CMD_FOR : _TK_FOR '(' ATR ';' EXP ';' ATR ')' BLOCO_OPCIONAL
         ;
-/* IDEIA: while(true){ //codigo qualquer } */
+
 CMD_WHILE : _TK_WHILE '(' EXP ')' BLOCO_OPCIONAL
           ;
 
@@ -188,6 +182,8 @@ ARRAY : '[' _C_INT ']' ARRAY
       ;
 
 GLOBAL_VAR : _TK_GLOBAL '{' LST_GLOBAL_VAR '}' ';'
+	   | /* epsylon */
+             { $$.c = ""; }
 	   ;
 
 LST_GLOBAL_VAR : VAR ';' LST_GLOBAL_VAR
@@ -200,6 +196,7 @@ ATR : _TK_ID '=' EXP
             { $$.c = $3.c + $1.v + " = " + $3.v + ";\n"; }
     | _TK_ID '[' EXP ']' '=' EXP 
             { $$.c = $6.c + $3.c + $1.v + $2.v + $3.v + $4.v + $3.c + " = " + $6.v + ";\n"; }
+    | _TK_ID '=' CHAMA_FUNC
     ;
 
 EXP : EXP '+' EXP  
@@ -247,17 +244,10 @@ EXP_UNARIA : _OP_INC EXP
                 { gerarCodigo_EXP_UNARIA(&$$, $1, $2); }
            ;
 
-/* Considerei aqui que ele pode imprimir qualquer coisa
-Adicionei o S para ele continuar a interpretar tudo, mas não sei se é a maneira correta.
-Sem o S não funcionou.
- */
-ESCRITA : _IO_PRINT '(' F ')' ';' S
+CMD_ESCRITA : _IO_PRINT '(' F ')' ';'
 	;
 			
-/* A ideia é poder realizar o scan e armazenar em uma variável 
-Adicionei o S pelo mesmo motivo do print
-*/
-LEITURA : _IO_SCAN '(' _TK_ID ')' ';' S
+CMD_LEITURA : _IO_SCAN '(' _TK_ID ')' ';'
 	;
 
 F : _TK_ID
