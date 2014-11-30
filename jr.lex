@@ -31,7 +31,6 @@ ID      {LETRA}({LETRA}|{NUMERO})*
     "break"    { yylval = Atributo( yytext ); return _TK_BREAK; }
     "default"  { yylval = Atributo( yytext ); return _TK_DEFAULT; }
     "return"   { yylval = Atributo( yytext ); return _TK_RETURN; }
-    "global"   { yylval = Atributo( yytext ); return _TK_GLOBAL; }
     
 %{ /* Tipos */ %}
     "int"       {  yylval = Atributo( "", yytext ); return _TK_INT; }

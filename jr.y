@@ -61,7 +61,7 @@ void yyerror(const char *);
 %}
 
 %token _C_INT _C_CHAR _C_DOUBLE _C_STRING _C_BOOL _C_FLOAT
-%token _TK_ID _TK_IF _TK_ELSE _TK_FOR _TK_WHILE _TK_DO _TK_SWITCH _TK_CASE _TK_BREAK _TK_DEFAULT _TK_RETURN _TK_GLOBAL
+%token _TK_ID _TK_IF _TK_ELSE _TK_FOR _TK_WHILE _TK_DO _TK_SWITCH _TK_CASE _TK_BREAK _TK_DEFAULT _TK_RETURN
 %token _TK_INT _TK_CHAR _TK_DOUBLE _TK_STRING _TK_BOOL _TK_FLOAT _TK_VOID
 %token _OP_NOT _OP_EQUAL _OP_DIF _OP_LESS_OR_EQUAL _OP_GREATER_OR_EQUAL _OP_INC _OP_DEC _OP_OR _OP_AND
 %token _IO_PRINT _IO_SCAN
@@ -79,40 +79,39 @@ void yyerror(const char *);
 
 %%
 
-S0 : GLOBAL_VAR LST_FUNC { cout <<  "#include <stdio.h>\n"
+S0 : GLOBAL_VAR { cout <<  "#include <stdio.h>\n"
                                     "#include <stdlib.h>\n"
                                     "#include <string.h>\n\n"
-                                << gerarDeclaracaoVariaveisTemporarias() << $1.c << $2.c << endl; }
+                                << gerarDeclaracaoVariaveisTemporarias() << $1.c << endl; }
    ;
 
-VAR_GLOBAIS : VAR_ARRAY {$$ = $1;}
-            | VAR       {$$ = $1;}
-            ;
+GLOBAL_VAR : VAR_ARRAY ';' GLOBAL_VAR
+                    {$$.c = $1.c + $3.c;}
+           | VAR ';' GLOBAL_VAR 
+                    {$$.c = $1.c + $3.c;}
+           | FUNCOES 
+                    {$$.c = $1.c;}
+           ;
 
-LST_FUNC : TIPO _TK_ID '(' LST_ARGUMENTOS ')' BLOCO LST_FUNC
+FUNCOES : TIPO _TK_ID '(' ARGUMENTOS ')' BLOCO FUNCOES
                     { $$.c = $1.t.nome + " " + $2.v + $3.v + $4.c + $5.v + "\n{" + $6.c + "}\n\n" + $7.c; }
          | /* epsylon */
                     { $$.c = ""; }
          ;
 
-LST_ARGUMENTOS : TIPO _TK_ID ',' LST_ARGUMENTOS 
-                    { $$.c = $1.t.nome + " " + $2.v + $3.v + " " + $4.c; }
-               | TIPO _TK_ID
-                    { $$.c = $1.t.nome + " " + $2.v; }
-               | /* epsylon */
-                    { $$.c = ""; }
-               ;
+ARGUMENTOS : TIPO _TK_ID ',' ARGUMENTOS 
+                { $$.c = $1.t.nome + " " + $2.v + $3.v + " " + $4.c; }
+           | TIPO _TK_ID
+                { $$.c = $1.t.nome + " " + $2.v; }
+           | /* epsylon */
+                { $$.c = ""; }
+           ;
 
-CHAMA_FUNC : _TK_ID '(' LST_CHAMA_FUNC ')'
-	       ;
-
-LST_CHAMA_FUNC : _TK_ID ',' LST_CHAMA_FUNC 
-	           | EXP ',' LST_CHAMA_FUNC 
-                   | _TK_ID
-	           | EXP
-               | /* epsylon */
-                    { $$.c = ""; }
-               ;
+PARAMETROS : EXP ',' PARAMETROS
+           | EXP
+           | /* epsylon */
+                { $$.c = ""; }
+           ;
 
 S : VAR ';' S 
         { $$.c = $1.c + "\n" + $3.c; }
@@ -149,7 +148,7 @@ COMANDO : CMD_IF
         | CMD_RETURN
       	| CMD_LEITURA
 	    | CMD_ESCRITA
-	    | CHAMA_FUNC ';'
+	    | CHAMA_FUNC
         ;
 
 CMD_RETURN : _TK_RETURN F ';'
@@ -161,10 +160,6 @@ CMD_RETURN : _TK_RETURN F ';'
 CMD_IF : _TK_IF '(' EXP ')' BLOCO_OPCIONAL  %prec _PRECEDENCIA_ELSE
                                   { gerarCodigoIf(&$$, $1, $3, $5); }
        | _TK_IF '(' EXP ')' BLOCO_OPCIONAL _TK_ELSE BLOCO_OPCIONAL
-                                  { $$.label = gerarLabel(); $$.t = gerarTemp();
-                                    $$.c =  $3.c + $$.t + " = " + "!" + $3.v + ";\n" + $1.v + " ( " + $$.t + " ) " + "goto " + 
-                                    $$.label + $5.c + $$.label + ":\n" + $7.c;
-                                  }
        ;
 
 CMD_FOR : _TK_FOR '(' ATR ';' EXP ';' ATR ')' BLOCO_OPCIONAL
@@ -206,6 +201,9 @@ TIPO : _TK_INT      { $$ = $1; }
      | _TK_VOID     { $$ = $1; }
      ;
      
+CHAMA_FUNC : _TK_ID '(' PARAMETROS ')'
+	       ;     
+
 VAR_ARRAY : TIPO '[' ']' _TK_ID ARRAY
                  { gerarDeclaracaoVariavel( tsGlobais, &$$, $1, $2 ); }
           ;
@@ -216,21 +214,8 @@ ARRAY : '[' _C_INT ']' ARRAY
              { $$.c = ""; }
       ;
 
-GLOBAL_VAR : _TK_GLOBAL '{' LST_GLOBAL_VAR '}' ';'
-	   | /* epsylon */
-             { $$.c = ""; }
-	   ;
-
-LST_GLOBAL_VAR : VAR ';' LST_GLOBAL_VAR
-	       | VAR_ARRAY ';' LST_GLOBAL_VAR
-               | /* epsylon */
-                    { $$.c = ""; }
-               ;
-
 ATR : _TK_ID '=' EXP
             { gerarCodigo_Atribuicao(tsGlobais, &$$, &$1, $3); }
-    | _TK_ID ARRAY '=' EXP
-    | _TK_ID '=' CHAMA_FUNC
     | _TK_ID '[' EXP ']' '=' EXP 
             { $$.c = $6.c + $3.c + "    " + $1.v + $2.v + $3.v + $4.v + $3.c + " = " + $6.v + ";\n"; }
     ;
@@ -286,12 +271,6 @@ CMD_ESCRITA : _IO_PRINT '(' F ')' ';'
 CMD_LEITURA : _IO_SCAN '(' _TK_ID ')' ';'
 	;
 
-F : _TK_ID
-  | _C_INT 
-  | _C_DOUBLE
-  | _C_BOOL
-  | _C_STRING
-
 F : _TK_ID { if( buscarVariavelTS( tsGlobais, $1.v, &$$.t ) ) 
                           $$.v = $1.v; 
                         else
@@ -300,7 +279,9 @@ F : _TK_ID { if( buscarVariavelTS( tsGlobais, $1.v, &$$.t ) )
   | _C_DOUBLE    { $$ = $1; }
   | _C_BOOL      { $$ = $1; }
   | _C_STRING    { $$ = $1; }
+  | _C_FLOAT     { $$ = $1; }
   | '(' EXP ')'  { $$ = $2; }
+  | CHAMA_FUNC
   ;
 
 %%

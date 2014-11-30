@@ -1,71 +1,16 @@
-global{
-	int a, b;
-	string c;
-};
+int b;
+boolean f;
 
-void escreveLetra(int a, string c) {
-    a = c;
-    print(a);
-    scan(a);
-    soma(a+b);
-    int[] arrayTeste[10][20];
-}
-
-void escreveLetra(int a, int c) 
+void escreveLetra() 
 {
-    d = !c;
+    int c;
+    c = c + 2453;
 }
 
-int main(){
-    vetor[12] = a;
-    a = a or b and c[a + b];
-    a = 1 + 3;
-    a = not c;
-    b = v equal c;
-    c = 5 % ++f * 3 + 2 ;
-    
-    if ( a + b ) {
-        a = a + b;
-    }
-    else if (x){
-       a = b;
-    }
-
-    a = 10;
-
-    for ( a=2 ; a < 3 ; a = a + 1){
-        b = 1;
-    }
-    
-    while (a == b) {
-        for ( a=2 ; a < 3 ; a = a + 1){
-            b = 1;
-        }
-    }
-	
-    string f;
-    
-    do {
-        a = c + v;
-    }while (a == b);
-
-    if (a == b) 
-    {
-        a = a + 3;
-    }
-    switch (a) {
-	case 2 :
-        case 5 :
-		    break;
-        case 10 : 
-		    a = 10+10;
-		    a = 20 + 1;
-		    b = 1;
-		    break;
-        default:
-		    break;
-    }
-    
-    return 0;
+int main()
+{
+    int a;
+    a = 2;
 }
+
 
