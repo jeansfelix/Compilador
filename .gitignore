@@ -32,5 +32,6 @@
 *.tab.c
 *.output
 jr
+saida
 
 
