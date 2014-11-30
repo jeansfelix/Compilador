@@ -3,29 +3,55 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
+#include <map>
 
 using namespace std;
 
+struct Tipo {
+  string nome;
+  
+  Tipo() {}
+  Tipo( string nome ) {
+    this->nome = nome;
+  }
+};
+
 struct Atributo {
   string v;  // Valor
-  string t;  // Tipo
+  Tipo t;    // Tipo
   string c;  // Codigo
   string label;
   
   Atributo() {}  // inicializacao automatica para vazio ""
   Atributo( string v, string t = "", string c = "", string label = "") {
     this->v = v;
-    this->t = t;
+    this->t.nome = t;
     this->c = c;
     this->label = label;
   }
 };
 
+typedef map< string, Tipo > TS;
+TS tsGlobais;
+
+string gerarLabel(string cmd);
+string gerarTemp(Tipo tipo);
+
+void erro( string msg );
+
+void inicializarResultadoOperacao();
+Tipo tipoResultado( Tipo a, string operador, Tipo b );
+string gerarDeclaracaoVariaveisTemporarias();
+
+void gerarCodigo_Atribuicao(TS& ts, Atributo *SS, Atributo *S1, const Atributo S3);
+void gerarDeclaracaoVariavel(TS& ts, Atributo* SS, const Atributo& tipo, const Atributo& id );
+bool buscarVariavelTS( TS& ts, string nomeVar, Tipo* tipo );
+void inserirVariavelTS( TS& ts, string nomeVar, Tipo tipo );
+
+void gerarCodigoIf(Atributo *SS, Atributo S1, Atributo S3, Atributo S5);
 void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3);
 void gerarCodigo_EXP_UNARIA(Atributo *atr, Atributo atr1 , Atributo atr2);
 
-string gerarLabel();
-string gerarTemp();
 
 #define YYSTYPE Atributo
 
@@ -53,38 +79,45 @@ void yyerror(const char *);
 
 %%
 
-S0 : GLOBAL_VAR LST_FUNC { cout << $$.c << endl; }
+S0 : GLOBAL_VAR LST_FUNC { cout <<  "#include <stdio.h>\n"
+                                    "#include <stdlib.h>\n"
+                                    "#include <string.h>\n\n"
+                                << gerarDeclaracaoVariaveisTemporarias() << $1.c << $2.c << endl; }
    ;
 
+VAR_GLOBAIS : VAR_ARRAY {$$ = $1;}
+            | VAR       {$$ = $1;}
+            ;
+
 LST_FUNC : TIPO _TK_ID '(' LST_ARGUMENTOS ')' BLOCO LST_FUNC
-                    { $$.c = $1.c + " " + $2.v + $3.v + $4.c + $5.v + "\n{" + $6.c + "}\n" + $7.c; }
+                    { $$.c = $1.t.nome + " " + $2.v + $3.v + $4.c + $5.v + "\n{" + $6.c + "}\n\n" + $7.c; }
          | /* epsylon */
                     { $$.c = ""; }
          ;
 
 LST_ARGUMENTOS : TIPO _TK_ID ',' LST_ARGUMENTOS 
-                    { $$.c = $1.c + " " + $2.v + $3.v + " " + $4.c; }
+                    { $$.c = $1.t.nome + " " + $2.v + $3.v + " " + $4.c; }
                | TIPO _TK_ID
-                    { $$.c = $1.c + " " + $2.v; }
+                    { $$.c = $1.t.nome + " " + $2.v; }
                | /* epsylon */
                     { $$.c = ""; }
                ;
 
 CHAMA_FUNC : _TK_ID '(' LST_CHAMA_FUNC ')'
-	   ;
+	       ;
 
 LST_CHAMA_FUNC : _TK_ID ',' LST_CHAMA_FUNC 
-	       | EXP ',' LST_CHAMA_FUNC 
-               | _TK_ID
-	       | EXP
+	           | EXP ',' LST_CHAMA_FUNC 
+                   | _TK_ID
+	           | EXP
                | /* epsylon */
                     { $$.c = ""; }
                ;
 
 S : VAR ';' S 
-        { $$.c = $1.c + $3.c; }
+        { $$.c = $1.c + "\n" + $3.c; }
   | VAR_ARRAY ';' S
-        { $$.c = $1.c + $3.c; }
+        { $$.c = $1.c + "\n" + $3.c; }
   | ATR ';' S 
         { $$.c = $1.c + $3.c; }
   | COMANDO S 
@@ -105,8 +138,8 @@ BLOCO_OPCIONAL : BLOCO
                ;
 
 BLOCO_CASE : S _TK_BREAK ';'
-	   | CASE
-	   ;
+	       | CASE
+	       ;
 
 COMANDO : CMD_IF
         | CMD_FOR
@@ -114,20 +147,19 @@ COMANDO : CMD_IF
         | CMD_DOWHILE
         | CMD_SWITCH
         | CMD_RETURN
-  	| CMD_LEITURA
-	| CMD_ESCRITA
-	| CHAMA_FUNC ';'
+      	| CMD_LEITURA
+	    | CMD_ESCRITA
+	    | CHAMA_FUNC ';'
         ;
 
 CMD_RETURN : _TK_RETURN F ';'
+                {$$.c = "    " + $1.v + " " + $2.v + ";\n";}
            | _TK_RETURN ';'
+                {$$.c = "    " + $1.v + ";\n";}
            ;
 
 CMD_IF : _TK_IF '(' EXP ')' BLOCO_OPCIONAL  %prec _PRECEDENCIA_ELSE
-                                  { $$.label = gerarLabel(); $$.t = gerarTemp();
-                                    $$.c =  $3.c + $$.t + " = " + "!" + $3.v + ";\n" + $1.v + " ( " + $$.t + " ) " + "goto " + 
-                                    $$.label + $5.c + $$.label + ":";
-                                  }
+                                  { gerarCodigoIf(&$$, $1, $3, $5); }
        | _TK_IF '(' EXP ')' BLOCO_OPCIONAL _TK_ELSE BLOCO_OPCIONAL
                                   { $$.label = gerarLabel(); $$.t = gerarTemp();
                                     $$.c =  $3.c + $$.t + " = " + "!" + $3.v + ";\n" + $1.v + " ( " + $$.t + " ) " + "goto " + 
@@ -160,19 +192,22 @@ CASE : _TK_CASE  _TK_ID    ':' BLOCO_CASE
      ;
 
 VAR : VAR ',' _TK_ID
+        { gerarDeclaracaoVariavel( tsGlobais, &$$, $1, $3 ); }
     | TIPO _TK_ID
+        { gerarDeclaracaoVariavel( tsGlobais ,&$$, $1, $2 ); }
     ;
     
-TIPO : _TK_INT      { $$.c = $1.v; }
-     | _TK_CHAR     { $$.c = $1.v; }
-     | _TK_BOOL     { $$.c = $1.v; }
-     | _TK_DOUBLE   { $$.c = $1.v; }
-     | _TK_FLOAT    { $$.c = $1.v; }
-     | _TK_STRING   { $$.c = $1.v; }
-     | _TK_VOID     { $$.c = $1.v; }
+TIPO : _TK_INT      { $$ = $1; }
+     | _TK_CHAR     { $$ = $1; }
+     | _TK_BOOL     { $$ = $1; }
+     | _TK_DOUBLE   { $$ = $1; }
+     | _TK_FLOAT    { $$ = $1; }
+     | _TK_STRING   { $$ = $1; }
+     | _TK_VOID     { $$ = $1; }
      ;
      
 VAR_ARRAY : TIPO '[' ']' _TK_ID ARRAY
+                 { gerarDeclaracaoVariavel( tsGlobais, &$$, $1, $2 ); }
           ;
 
 ARRAY : '[' _C_INT ']' ARRAY
@@ -192,10 +227,12 @@ LST_GLOBAL_VAR : VAR ';' LST_GLOBAL_VAR
                     { $$.c = ""; }
                ;
 
-ATR : _TK_ID '=' EXP 
-            { $$.c = $3.c + $1.v + " = " + $3.v + ";\n"; }
+ATR : _TK_ID '=' EXP
+            { gerarCodigo_Atribuicao(tsGlobais, &$$, &$1, $3); }
     | _TK_ID ARRAY '=' EXP
     | _TK_ID '=' CHAMA_FUNC
+    | _TK_ID '[' EXP ']' '=' EXP 
+            { $$.c = $6.c + $3.c + "    " + $1.v + $2.v + $3.v + $4.v + $3.c + " = " + $6.v + ";\n"; }
     ;
 
 EXP : EXP '+' EXP  
@@ -227,7 +264,7 @@ EXP : EXP '+' EXP
     | EXP_UNARIA
             { $$.c = $1.c; }
     | _TK_ID '[' INDICE ']'
-            { $$.v = gerarTemp(); $$.c = $1.v + $2.v + $3.v +  $4.v + "\n"; }
+            { $$.v = gerarTemp($1.t); $$.c = $1.v + $2.v + $3.v + $4.v + "\n"; }
     | F
     ;
     
@@ -254,17 +291,34 @@ F : _TK_ID
   | _C_DOUBLE
   | _C_BOOL
   | _C_STRING
+
+F : _TK_ID { if( buscarVariavelTS( tsGlobais, $1.v, &$$.t ) ) 
+                          $$.v = $1.v; 
+                        else
+                          erro( "Variavel nao declarada: " + $1.v ); }	
+  | _C_INT       { $$ = $1; }
+  | _C_DOUBLE    { $$ = $1; }
+  | _C_BOOL      { $$ = $1; }
+  | _C_STRING    { $$ = $1; }
   | '(' EXP ')'  { $$ = $2; }
   ;
 
 %%
 int nlinha = 1;
-int n_var_temp = 0;
-int n_label_temp = 0;
+
+map<string,int> n_var_temp;
+map<string,Tipo> resultadoOperacao;
+map<string,int> n_label;
 
 #include "lex.yy.c"
 
 int yyparse();
+
+void erro( string msg )
+{
+  yyerror( msg.c_str() );
+  exit(0);
+}
 
 string toStr( int n )
 {
@@ -281,29 +335,151 @@ void yyerror( const char* st )
   printf( "Linha: %d\nPerto de: '%s'\n", nlinha, yytext );
 }
 
+void inicializarResultadoOperacao()
+{
+  resultadoOperacao["string+string"] = Tipo( "string" );
+  resultadoOperacao["int+int"] = Tipo( "int" );
+  resultadoOperacao["int-int"] = Tipo( "int" );
+  resultadoOperacao["int*int"] = Tipo( "int" );
+  resultadoOperacao["int%int"] = Tipo( "int" );
+  resultadoOperacao["int/int"] = Tipo( "int" );
+  resultadoOperacao["int==int"] = Tipo( "boolean" );
+  resultadoOperacao["int<int"] = Tipo( "boolean" );
+  resultadoOperacao["int>int"] = Tipo( "boolean" );
+  resultadoOperacao["!boolean"] = Tipo("boolean");
+  resultadoOperacao["double+int"] = Tipo( "double" );
+  resultadoOperacao["int*double"] = Tipo( "double" );
+}
+
+Tipo tipoResultado( Tipo a, string operador, Tipo b ) 
+{
+  if( resultadoOperacao.find( a.nome + operador + b.nome ) == resultadoOperacao.end() )
+    erro( "Operacao nao permitida: " + a.nome + operador + b.nome );
+
+  return resultadoOperacao[a.nome + operador + b.nome];
+}
+
+void gerarCodigo_Atribuicao(TS& ts, Atributo *SS, Atributo *S1, Atributo S3)
+{
+    if (!buscarVariavelTS( ts, S1->v, &SS->t )) 
+    {
+         erro( "Variavel nao declarada: " + S1->v );
+    }
+    
+    S1->t = ts[S1->v];
+    
+    if (S1->t.nome == S3.t.nome ) 
+    {
+        SS->c = S3.c + "    " + S1->v + " = " + S3.v + ";\n";
+        SS->t = S1->t;
+    }
+    else
+    {
+        erro("Tipo " +  S3.t.nome + " não pode ser atribuído a " + S1->t.nome + " \n");
+    }
+}
+
+void gerarCodigoIf(Atributo *SS, Atributo S1, Atributo S3, Atributo S5)
+{
+    string label = gerarLabel("if_false"); 
+    string temp = gerarTemp(Tipo("bool"));
+    
+    SS->c =  S3.c + "    " + temp + " = " + "!" + S3.v + ";\n" + "    " +
+    S1.v + " ( " + temp + " ) " + "goto " + 
+    label + ";" + S5.c + label + ":\n";
+}
+
 void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3) 
 {
-  atr->v = gerarTemp();
-  atr->c = atr1.c + atr3.c + atr->v + " = " + atr1.v + " " + atr2.v + " " + atr3.v + ";\n";
+    atr->t = tipoResultado( atr1.t, atr2.v, atr3.t );
+    atr->v = gerarTemp(atr->t);
+    atr->c = atr1.c + atr3.c + "    " + atr->v + " = " + atr1.v + " " + atr2.v + " " + atr3.v + ";\n";
 }
 
 void gerarCodigo_EXP_UNARIA(Atributo *atr, Atributo atr1 , Atributo atr2) 
 {
-  atr->v = gerarTemp(); 
-  atr->c = atr2.c + atr->v + " = " + atr1.v + atr2.v + ";\n";
+    atr->t = tipoResultado( Tipo(""), atr1.v, atr2.t );
+    atr->v = gerarTemp(atr->t); 
+    atr->c = atr2.c + "    " + atr->v + " = " + atr1.v + atr2.v + ";\n";
 }
 
-string gerarTemp()
-{
-  return "temp_" + toStr( ++n_var_temp );
+bool buscarVariavelTS( TS& ts, string nomeVar, Tipo* tipo ) {
+  if( ts.find( nomeVar ) != ts.end() ) {
+    *tipo = ts[ nomeVar ];
+    return true;
+  }
+  else
+    return false;
 }
 
-string gerarLabel()
+void gerarDeclaracaoVariavel(TS& ts, Atributo* SS, const Atributo& tipo, const Atributo& id ) {
+  SS->v = "";
+  SS->t = tipo.t;
+  
+  inserirVariavelTS( ts, id.v, tipo.t );
+
+  if( tipo.t.nome == "string" ) {
+    SS->c = tipo.c + "    " +
+           "char " + id.v + "["+ toStr( 255 ) +"];\n";   
+  }
+  else {
+    SS->c = tipo.c + "    " +
+            tipo.t.nome + " " + id.v + ";\n";
+  }
+}
+
+string gerarDeclaracaoVariaveisTemporarias() {
+    string c;
+
+    for( int i = 0; i < n_var_temp["bool"]; i++ )
+        c += "int temp_bool_" + toStr( i + 1 ) + ";\n";
+
+    for( int i = 0; i < n_var_temp["int"]; i++ )
+        c += "int temp_int_" + toStr( i + 1 ) + ";\n";
+
+    for( int i = 0; i < n_var_temp["char"]; i++ )
+        c += "char temp_char_" + toStr( i + 1 ) + ";\n";
+
+    for( int i = 0; i < n_var_temp["double"]; i++ )
+        c += "double temp_double_" + toStr( i + 1 ) + ";\n";
+
+    for( int i = 0; i < n_var_temp["float"]; i++ )
+        c += "float temp_float_" + toStr( i + 1 ) + ";\n";
+
+    for( int i = 0; i < n_var_temp["string"]; i++ )
+        c += "char temp_string_" + toStr( i + 1 ) + "[" + toStr( 255 )+ "];\n";
+
+    return c;  
+}
+
+void inserirVariavelTS( TS& ts, string nomeVar, Tipo tipo ) 
 {
-  return "LABEL_" + toStr( ++n_label_temp );
+    if( !buscarVariavelTS( ts, nomeVar, &tipo ) )
+        ts[nomeVar] = tipo;
+    else  
+        erro( "Variavel já definida: " + nomeVar );
+}
+
+void verificarDeclaracaoVariavel(TS& ts, Atributo *SS, Atributo S1) 
+{
+    if( buscarVariavelTS( ts, S1.v, &(SS->t)) )
+      SS->v = S1.v; 
+    else
+      erro( "Variavel nao declarada: " + S1.v );
+}
+
+string gerarTemp(Tipo tipo)
+{
+    return "temp_" + tipo.nome + "_" + toStr( ++n_var_temp[tipo.nome] );
+}
+
+string gerarLabel(string cmd)
+{
+    return "LABEL_" + cmd + "_" + toStr( ++n_label[cmd] );
 }
 
 int main( int argc, char* argv[] )
 {
-  yyparse();
+    inicializarResultadoOperacao();
+    yyparse();
 }

@@ -1,5 +1,5 @@
 all: trabalho entrada.cc
-	./jr < entrada.cc
+	./jr < entrada.cc > saida.c
 
 lex.yy.c: jr.lex
 	lex jr.lex

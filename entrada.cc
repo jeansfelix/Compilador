@@ -11,7 +11,12 @@ void escreveLetra(int a, string c) {
     int[] arrayTeste[10][20];
 }
 
-int main(int argc, char argv){
+void escreveLetra(int a, int c) 
+{
+    d = !c;
+}
+
+int main(){
     vetor[12] = a;
     a = a or b and c[a + b];
     a = 1 + 3;
@@ -37,11 +42,17 @@ int main(int argc, char argv){
             b = 1;
         }
     }
+	
+    string f;
     
     do {
         a = c + v;
     }while (a == b);
 
+    if (a == b) 
+    {
+        a = a + 3;
+    }
     switch (a) {
 	case 2 :
         case 5 :

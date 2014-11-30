@@ -34,13 +34,13 @@ ID      {LETRA}({LETRA}|{NUMERO})*
     "global"   { yylval = Atributo( yytext ); return _TK_GLOBAL; }
     
 %{ /* Tipos */ %}
-    "int"       {  yylval = Atributo( yytext ); return _TK_INT; }
-    "char"      {  yylval = Atributo( yytext ); return _TK_CHAR; }
-    "boolean"   {  yylval = Atributo( yytext ); return _TK_BOOL; }
-    "double"    {  yylval = Atributo( yytext ); return _TK_DOUBLE; }
-    "float"     {  yylval = Atributo( yytext ); return _TK_FLOAT; }
-    "string"    {  yylval = Atributo( yytext ); return _TK_STRING; }
-    "void"      {  yylval = Atributo( yytext ); return _TK_VOID; }
+    "int"       {  yylval = Atributo( "", yytext ); return _TK_INT; }
+    "char"      {  yylval = Atributo( "", yytext ); return _TK_CHAR; }
+    "boolean"   {  yylval = Atributo( "", yytext ); return _TK_BOOL; }
+    "double"    {  yylval = Atributo( "", yytext ); return _TK_DOUBLE; }
+    "float"     {  yylval = Atributo( "", yytext ); return _TK_FLOAT; }
+    "string"    {  yylval = Atributo( "", yytext ); return _TK_STRING; }
+    "void"      {  yylval = Atributo( "", yytext ); return _TK_VOID; }
 
 %{ /* Operadores */ %}
     {NOT}       {  yylval = Atributo( "!" ); return _OP_NOT; }
@@ -54,10 +54,10 @@ ID      {LETRA}({LETRA}|{NUMERO})*
     "--"        {  yylval = Atributo( yytext ); return _OP_DEC; }
 
 %{ /* Constantes */ %}
-    {BOOL}     { std::string s = "true"; yylval = Atributo( !s.compare(yytext)? "1" : "0" ); return _C_BOOL; }
-    {INT}      { yylval = Atributo( yytext ); return _C_INT; }
-    {DOUBLE}   { yylval = Atributo( yytext ); return _C_DOUBLE; }
-    {STRING}   { yylval = Atributo( yytext ); return _C_STRING; }
+    {BOOL}     { std::string s = "true"; yylval = Atributo( !s.compare(yytext)? "1" : "0", "boolean"); return _C_BOOL; }
+    {INT}      { yylval = Atributo( yytext, "int" ); return _C_INT; }
+    {DOUBLE}   { yylval = Atributo( yytext, "double" ); return _C_DOUBLE; }
+    {STRING}   { yylval = Atributo( yytext, "string" ); return _C_STRING; }
 
 %{ /* IO */ %}
     "print" {yylval = Atributo( yytext ); return _IO_PRINT;}
