@@ -1,4 +1,7 @@
-all: trabalho entrada.cc
+all: gerarSaida saida
+	gcc -o saida saida.c -Wall
+
+gerarSaida: trabalho entrada.cc
 	./jr < entrada.cc > saida.c
 
 lex.yy.c: jr.lex

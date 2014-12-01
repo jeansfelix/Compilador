@@ -7,6 +7,8 @@
 
 using namespace std;
 
+const int MAX_STRING = 256;
+
 struct Tipo {
   string nome;
   
@@ -47,6 +49,7 @@ void gerarCodigo_Atribuicao(TS& ts, Atributo *SS, Atributo *S1, const Atributo S
 void gerarDeclaracaoVariavel(TS& ts, Atributo* SS, const Atributo& tipo, const Atributo& id );
 bool buscarVariavelTS( TS& ts, string nomeVar, Tipo* tipo );
 void inserirVariavelTS( TS& ts, string nomeVar, Tipo tipo );
+void testarSeVariavelFoiDeclarada(TS& ts, Atributo *atr, Atributo atr1);
 
 void gerarCodigoIf(Atributo *SS, Atributo S1, Atributo S3, Atributo S5);
 void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3);
@@ -79,10 +82,10 @@ void yyerror(const char *);
 
 %%
 
-S0 : GLOBAL_VAR { cout <<  "#include <stdio.h>\n"
-                                    "#include <stdlib.h>\n"
-                                    "#include <string.h>\n\n"
-                                << gerarDeclaracaoVariaveisTemporarias() << $1.c << endl; }
+S0 : GLOBAL_VAR { cout << "#include <stdio.h>\n"
+                          "#include <stdlib.h>\n"
+                          "#include <string.h>\n\n"
+                       << gerarDeclaracaoVariaveisTemporarias() << $1.c << endl; }
    ;
 
 GLOBAL_VAR : VAR_ARRAY ';' GLOBAL_VAR
@@ -141,14 +144,23 @@ BLOCO_CASE : S _TK_BREAK ';'
 	       ;
 
 COMANDO : CMD_IF
+            {$$ = $1;}
         | CMD_FOR
+            {$$ = $1;}
         | CMD_WHILE
+            {$$ = $1;}
         | CMD_DOWHILE
+            {$$ = $1;}
         | CMD_SWITCH
+            {$$ = $1;}
         | CMD_RETURN
+            {$$ = $1;}
       	| CMD_LEITURA
+      	    {$$ = $1;}
 	    | CMD_ESCRITA
+	        {$$ = $1;}
 	    | CHAMA_FUNC
+	        {$$ = $1;}
         ;
 
 CMD_RETURN : _TK_RETURN F ';'
@@ -174,6 +186,13 @@ CMD_DOWHILE : _TK_DO BLOCO _TK_WHILE '(' EXP ')' ';'
 CMD_SWITCH : _TK_SWITCH '(' _TK_ID ')' '{' LST_CASE '}'
            ;
 
+CMD_ESCRITA : _IO_PRINT '(' F ')' ';'
+                    { $$.c = "    printf(\"%s\"," + $3.v + ");\n"; }
+	        ;
+			
+CMD_LEITURA : _IO_SCAN '(' _TK_ID ')' ';'
+	        ;
+
 LST_CASE : CASE LST_CASE
          | _TK_DEFAULT ':' S _TK_BREAK ';'
          | /* epsylon */
@@ -185,6 +204,16 @@ CASE : _TK_CASE  _TK_ID    ':' BLOCO_CASE
      | _TK_CASE  _C_CHAR   ':' BLOCO_CASE
      | _TK_CASE  _C_STRING ':' BLOCO_CASE
      ;
+
+VAR_ARRAY : TIPO '[' ']' _TK_ID ARRAY
+                 { gerarDeclaracaoVariavel( tsGlobais, &$$, $1, $2 ); }
+          ;
+
+ARRAY : '[' _C_INT ']' ARRAY
+             { $$.c = $2.v ;}
+      | /* epsylon */
+             { $$.c = ""; }
+      ;
 
 VAR : VAR ',' _TK_ID
         { gerarDeclaracaoVariavel( tsGlobais, &$$, $1, $3 ); }
@@ -203,17 +232,7 @@ TIPO : _TK_INT      { $$ = $1; }
      
 CHAMA_FUNC : _TK_ID '(' PARAMETROS ')'
 	       ;     
-
-VAR_ARRAY : TIPO '[' ']' _TK_ID ARRAY
-                 { gerarDeclaracaoVariavel( tsGlobais, &$$, $1, $2 ); }
-          ;
-
-ARRAY : '[' _C_INT ']' ARRAY
-             { $$.c = $2.v ;}
-      | /* epsylon */
-             { $$.c = ""; }
-      ;
-
+	       
 ATR : _TK_ID '=' EXP
             { gerarCodigo_Atribuicao(tsGlobais, &$$, &$1, $3); }
     | _TK_ID '[' EXP ']' '=' EXP 
@@ -265,23 +284,14 @@ EXP_UNARIA : _OP_INC EXP
                 { gerarCodigo_EXP_UNARIA(&$$, $1, $2); }
            ;
 
-CMD_ESCRITA : _IO_PRINT '(' F ')' ';'
-	;
-			
-CMD_LEITURA : _IO_SCAN '(' _TK_ID ')' ';'
-	;
-
-F : _TK_ID { if( buscarVariavelTS( tsGlobais, $1.v, &$$.t ) ) 
-                          $$.v = $1.v; 
-                        else
-                          erro( "Variavel nao declarada: " + $1.v ); }	
+F : _TK_ID       { testarSeVariavelFoiDeclarada(tsGlobais, &$$, $1); }	
   | _C_INT       { $$ = $1; }
   | _C_DOUBLE    { $$ = $1; }
   | _C_BOOL      { $$ = $1; }
   | _C_STRING    { $$ = $1; }
   | _C_FLOAT     { $$ = $1; }
   | '(' EXP ')'  { $$ = $2; }
-  | CHAMA_FUNC
+  | CHAMA_FUNC   { $$ = $1; }
   ;
 
 %%
@@ -316,22 +326,6 @@ void yyerror( const char* st )
   printf( "Linha: %d\nPerto de: '%s'\n", nlinha, yytext );
 }
 
-void inicializarResultadoOperacao()
-{
-  resultadoOperacao["string+string"] = Tipo( "string" );
-  resultadoOperacao["int+int"] = Tipo( "int" );
-  resultadoOperacao["int-int"] = Tipo( "int" );
-  resultadoOperacao["int*int"] = Tipo( "int" );
-  resultadoOperacao["int%int"] = Tipo( "int" );
-  resultadoOperacao["int/int"] = Tipo( "int" );
-  resultadoOperacao["int==int"] = Tipo( "boolean" );
-  resultadoOperacao["int<int"] = Tipo( "boolean" );
-  resultadoOperacao["int>int"] = Tipo( "boolean" );
-  resultadoOperacao["!boolean"] = Tipo("boolean");
-  resultadoOperacao["double+int"] = Tipo( "double" );
-  resultadoOperacao["int*double"] = Tipo( "double" );
-}
-
 Tipo tipoResultado( Tipo a, string operador, Tipo b ) 
 {
   if( resultadoOperacao.find( a.nome + operador + b.nome ) == resultadoOperacao.end() )
@@ -351,8 +345,15 @@ void gerarCodigo_Atribuicao(TS& ts, Atributo *SS, Atributo *S1, Atributo S3)
     
     if (S1->t.nome == S3.t.nome ) 
     {
-        SS->c = S3.c + "    " + S1->v + " = " + S3.v + ";\n";
-        SS->t = S1->t;
+        if (S1->t.nome == "string") 
+        {
+            SS->c = S3.c + "    strcpy(" + S1->v + ", " + S3.v + ");\n";
+        }
+        else 
+        {
+            SS->c = S3.c + "    " + S1->v + " = " + S3.v + ";\n";
+            SS->t = S1->t;
+        }
     }
     else
     {
@@ -401,7 +402,7 @@ void gerarDeclaracaoVariavel(TS& ts, Atributo* SS, const Atributo& tipo, const A
 
   if( tipo.t.nome == "string" ) {
     SS->c = tipo.c + "    " +
-           "char " + id.v + "["+ toStr( 255 ) +"];\n";   
+           "char " + id.v + "["+ toStr( MAX_STRING ) +"];\n";   
   }
   else {
     SS->c = tipo.c + "    " +
@@ -428,7 +429,7 @@ string gerarDeclaracaoVariaveisTemporarias() {
         c += "float temp_float_" + toStr( i + 1 ) + ";\n";
 
     for( int i = 0; i < n_var_temp["string"]; i++ )
-        c += "char temp_string_" + toStr( i + 1 ) + "[" + toStr( 255 )+ "];\n";
+        c += "char temp_string_" + toStr( i + 1 ) + "[" + toStr( MAX_STRING )+ "];\n";
 
     return c;  
 }
@@ -441,12 +442,12 @@ void inserirVariavelTS( TS& ts, string nomeVar, Tipo tipo )
         erro( "Variavel já definida: " + nomeVar );
 }
 
-void verificarDeclaracaoVariavel(TS& ts, Atributo *SS, Atributo S1) 
+void testarSeVariavelFoiDeclarada(TS& ts, Atributo *atr, Atributo atr1) 
 {
-    if( buscarVariavelTS( ts, S1.v, &(SS->t)) )
-      SS->v = S1.v; 
+    if( buscarVariavelTS( tsGlobais, atr1.v, &(atr->t) ) ) 
+      atr->v = atr1.v; 
     else
-      erro( "Variavel nao declarada: " + S1.v );
+      erro( "Variavel nao declarada: " + atr1.v );
 }
 
 string gerarTemp(Tipo tipo)
@@ -457,6 +458,31 @@ string gerarTemp(Tipo tipo)
 string gerarLabel(string cmd)
 {
     return "LABEL_" + cmd + "_" + toStr( ++n_label[cmd] );
+}
+
+void inicializarResultadoOperacao()
+{
+  resultadoOperacao["string+string"] = Tipo("string");
+  resultadoOperacao["string+int"] = Tipo("string");
+  resultadoOperacao["int+string"] = Tipo("string");
+  
+  resultadoOperacao["int+int"] = Tipo("int");
+  resultadoOperacao["int-int"] = Tipo("int");
+  resultadoOperacao["int*int"] = Tipo("int");
+  resultadoOperacao["int%int"] = Tipo("int");
+  resultadoOperacao["int/int"] = Tipo("int");
+  resultadoOperacao["++int"] = Tipo("int");
+  resultadoOperacao["--int"] = Tipo("int");
+  
+  resultadoOperacao["int==int"] = Tipo("boolean");
+  resultadoOperacao["int<int"] = Tipo("boolean");
+  resultadoOperacao["int>int"] = Tipo("boolean");
+  resultadoOperacao["int<=int"] = Tipo("boolean");
+  resultadoOperacao["int>=int"] = Tipo("boolean");
+  resultadoOperacao["!boolean"] = Tipo("boolean");
+  
+  resultadoOperacao["double+int"] = Tipo("double");
+  resultadoOperacao["int*double"] = Tipo("double");
 }
 
 int main( int argc, char* argv[] )
