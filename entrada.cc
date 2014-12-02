@@ -1,25 +1,20 @@
-int b;
-
-int retornarNumero() {
-    int a;
-    
-    a = 2;
-    
-    string c;
-    
-    return a;
-}
+string b;
 
 int main()
 {
-    string a;
-
-    a = "ola mundo!\n";
+    b = "";
     
-    b = (2 + 3) ;
+    if (false) 
+    {
+        b = "1";
+    }
+    else 
+    {
+        b = "2";
+    }
     
-    print(a);
-    
+    print(b);
+        
     return 0;
 }
 

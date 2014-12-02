@@ -62,7 +62,8 @@ void gerarDeclaracaoVariavel(Atributo* SS, const Atributo& tipo, const Atributo&
 void inserirVariavelTS( string nomeVar, Tipo tipo );
 void gerarCodigo_F_para_TK_ID(Atributo *atr, Atributo atr1);
 
-void gerarCodigoIf(Atributo *SS, Atributo S1, Atributo S3, Atributo S5);
+void gerarCodigoIf(Atributo *SS, Atributo exp_if, Atributo bloco_if);
+void gerarCodigoIfElse(Atributo *SS, Atributo exp_if, Atributo bloco_if, Atributo bloco_else);
 void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3);
 void gerarCodigo_EXP_UNARIA(Atributo *atr, Atributo atr1 , Atributo atr2);
 
@@ -186,8 +187,9 @@ CMD_RETURN : _TK_RETURN F ';'
            ;
 
 CMD_IF : _TK_IF '(' EXP ')' BLOCO_OPCIONAL  %prec _PRECEDENCIA_ELSE
-                                  { gerarCodigoIf(&$$, $1, $3, $5); }
+                                  { gerarCodigoIf(&$$, $3, $5); }
        | _TK_IF '(' EXP ')' BLOCO_OPCIONAL _TK_ELSE BLOCO_OPCIONAL
+                                  { gerarCodigoIfElse(&$$, $3, $5, $7); }
        ;
 
 CMD_FOR : _TK_FOR '(' ATR ';' EXP ';' ATR ')' BLOCO_OPCIONAL
@@ -387,14 +389,23 @@ void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, Atributo S3)
     }
 }
 
-void gerarCodigoIf(Atributo *SS, Atributo S1, Atributo S3, Atributo S5)
+void gerarCodigoIf(Atributo *SS, Atributo exp_if, Atributo bloco_if)
 {
-    string label = gerarLabel("if_false"); 
-    string temp = gerarTemp(Tipo("bool"));
+    string label_if_false = gerarLabel("if_false"); 
+    string temp = gerarTemp(Tipo("boolean"));
     
-    SS->c =  S3.c + "    " + temp + " = " + "!" + S3.v + ";\n" + "    " +
-    S1.v + " ( " + temp + " ) " + "goto " + 
-    label + ";" + S5.c + label + ":\n";
+    SS->c =  exp_if.c + "    " + temp + " = " + "!" + exp_if.v + ";\n    if ( " + temp + " ) goto " + label_if_false + ";\n" + 
+             bloco_if.c + label_if_false + ":\n";
+}
+
+void gerarCodigoIfElse(Atributo *SS, Atributo exp_if, Atributo bloco_if, Atributo bloco_else)
+{
+    string label_if_true        = gerarLabel("if_true");
+    string label_fim_if_else    = gerarLabel("fim_if_else");
+    
+    SS->c =  exp_if.c + "    if ( " + exp_if.v + " ) goto " + label_if_true + ";\n" + 
+             bloco_else.c + "    goto " + label_fim_if_else + ";\n" + label_if_true + ":\n" +
+             bloco_if.c + label_fim_if_else + ":\n";
 }
 
 void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3) 
@@ -535,8 +546,8 @@ string gerarDeclaracaoVariaveisLocais(string escopoFuncao) {
 string gerarDeclaracaoVariaveisTemporarias() {
     string c;
 
-    for( int i = 0; i < n_var_temp["bool"]; i++ )
-        c += "int temp_bool_" + toStr( i + 1 ) + ";\n";
+    for( int i = 0; i < n_var_temp["boolean"]; i++ )
+        c += "int temp_boolean_" + toStr( i + 1 ) + ";\n";
 
     for( int i = 0; i < n_var_temp["int"]; i++ )
         c += "int temp_int_" + toStr( i + 1 ) + ";\n";
