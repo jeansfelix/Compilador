@@ -48,7 +48,11 @@ void erro( string msg );
 
 void inicializarResultadoOperacao();
 Tipo tipoResultado( Tipo a, string operador, Tipo b );
+
 string gerarDeclaracaoVariaveisTemporarias();
+string gerarDeclaracaoVariaveisGlobais();
+string gerarDeclaracaoVariaveisLocais(string escopoFuncao);
+
 bool buscarVariavelTS( TS& ts, string nomeVar, Tipo* tipo );
 bool buscarVariavelTS( TS& ts, string nomeVar );
 bool verificarSeVariavelFoiDeclarada(string nomeVar);
@@ -92,19 +96,20 @@ void yyerror(const char *);
 S0 : GLOBAL_VAR { cout << "#include <stdio.h>\n"
                           "#include <stdlib.h>\n"
                           "#include <string.h>\n\n"
-                       << gerarDeclaracaoVariaveisTemporarias() << $1.c << endl; }
+                       << gerarDeclaracaoVariaveisTemporarias() << gerarDeclaracaoVariaveisGlobais() + "\n" << $1.c << endl; }
    ;
 
 GLOBAL_VAR : VAR_ARRAY ';' GLOBAL_VAR
-                    {$$.c = $1.c + $3.c;}
+                    {$$.c = $3.c;}
            | VAR ';' GLOBAL_VAR 
-                    {$$.c = $1.c + $3.c;}
+                    {$$.c = $3.c;}
            | FUNCOES 
                     {$$.c = $1.c;}
            ;
 
 FUNCOES : TIPO NOME_FUNC '(' ARGUMENTOS ')' BLOCO FUNCOES
-                    { $$.c = $1.t.nome + " " + $2.v + $3.v + $4.c + $5.v + "\n{" + $6.c + "}\n\n" + $7.c; }
+                    { $$.c = $1.t.nome + " " + $2.v + $3.v + $4.c + $5.v + 
+                          "\n{\n" + gerarDeclaracaoVariaveisLocais($2.v) + $6.c + "}\n\n" + $7.c; }
          | /* epsylon */
                     { $$.c = ""; }
          ;
@@ -139,7 +144,7 @@ S : VAR ';' S
         { $$.c = ""; }
   ;
 
-BLOCO : '{' S '}' {$$.c = "\n" + $2.c;}
+BLOCO : '{' S '}' {$$.c = $2.c;}
       ;
 
 BLOCO_OPCIONAL : BLOCO   
@@ -430,7 +435,6 @@ bool buscarVariavelTS( TS& ts, string nomeVar )
 void gerarDeclaracaoVariavel(Atributo* SS, const Atributo& tipo, const Atributo& id )
 {
     SS->v = "";
-    SS->t = tipo.t;
 
     if (verificarSeVariavelFoiDeclarada(id.v)) 
     {
@@ -438,17 +442,6 @@ void gerarDeclaracaoVariavel(Atributo* SS, const Atributo& tipo, const Atributo&
     }
 
     inserirVariavelTS(id.v, tipo.t );
-
-    if( tipo.t.nome == "string" ) 
-    {
-        SS->c = tipo.c + "    " +
-               "char " + id.v + "["+ toStr( MAX_STRING ) +"];\n";   
-    }
-    else 
-    {
-        SS->c = tipo.c + "    " +
-                tipo.t.nome + " " + id.v + ";\n";
-    }
 }
 
 void inserirVariavelTS(string nomeVar, Tipo tipo ) 
@@ -501,6 +494,42 @@ void gerarCodigo_F_para_TK_ID(Atributo *atr, Atributo atr1)
         return;
     }
     erro( "Variavel nao declarada: " + atr1.v );
+}
+
+string gerarDeclaracaoVariaveisGlobais() {
+    string c = "";
+    
+    for (std::map<string, Tipo>::iterator it=tsGlobais.begin(); it!=tsGlobais.end(); ++it)
+    {
+        if (it->second.nome != "string")
+        {
+            c = c + it->second.nome + " " + it->first + ";\n";
+        }
+        else {
+            c = c + "char " + it->first + "["+ toStr( MAX_STRING ) +"];\n"; ;
+        }
+    }
+    
+    return c;
+}
+
+string gerarDeclaracaoVariaveisLocais(string escopoFuncao) {
+    TS ts = fs[escopoFuncao];
+    
+    string c = "";
+    
+    for (std::map<string, Tipo>::iterator it=ts.begin(); it!=ts.end(); ++it)
+    {
+        if (it->second.nome != "string")
+        {
+            c = c + "    " + it->second.nome + " " + it->first + ";\n";
+        }
+        else {
+            c = c + "    char " + it->first + "["+ toStr( MAX_STRING ) +"];\n"; ;
+        }
+    }
+    
+    return c;
 }
 
 string gerarDeclaracaoVariaveisTemporarias() {

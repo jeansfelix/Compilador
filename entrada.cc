@@ -1,5 +1,15 @@
 int b;
 
+int retornarNumero() {
+    int a;
+    
+    a = 2;
+    
+    string c;
+    
+    return a;
+}
+
 int main()
 {
     string a;
