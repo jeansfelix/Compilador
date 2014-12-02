@@ -34,7 +34,12 @@ struct Atributo {
 };
 
 typedef map< string, Tipo > TS;
+typedef map< string, TS > FunctionScopes;
+
 TS tsGlobais;
+FunctionScopes fs;
+
+string scope = "global";
 
 string gerarLabel(string cmd);
 string gerarTemp(Tipo tipo);
@@ -44,12 +49,14 @@ void erro( string msg );
 void inicializarResultadoOperacao();
 Tipo tipoResultado( Tipo a, string operador, Tipo b );
 string gerarDeclaracaoVariaveisTemporarias();
-
-void gerarCodigo_Atribuicao(TS& ts, Atributo *SS, Atributo *S1, const Atributo S3);
-void gerarDeclaracaoVariavel(TS& ts, Atributo* SS, const Atributo& tipo, const Atributo& id );
 bool buscarVariavelTS( TS& ts, string nomeVar, Tipo* tipo );
-void inserirVariavelTS( TS& ts, string nomeVar, Tipo tipo );
-void testarSeVariavelFoiDeclarada(TS& ts, Atributo *atr, Atributo atr1);
+bool buscarVariavelTS( TS& ts, string nomeVar );
+bool verificarSeVariavelFoiDeclarada(string nomeVar);
+
+void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, const Atributo S3);
+void gerarDeclaracaoVariavel(Atributo* SS, const Atributo& tipo, const Atributo& id );
+void inserirVariavelTS( string nomeVar, Tipo tipo );
+void gerarCodigo_F_para_TK_ID(Atributo *atr, Atributo atr1);
 
 void gerarCodigoIf(Atributo *SS, Atributo S1, Atributo S3, Atributo S5);
 void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3);
@@ -96,11 +103,15 @@ GLOBAL_VAR : VAR_ARRAY ';' GLOBAL_VAR
                     {$$.c = $1.c;}
            ;
 
-FUNCOES : TIPO _TK_ID '(' ARGUMENTOS ')' BLOCO FUNCOES
+FUNCOES : TIPO NOME_FUNC '(' ARGUMENTOS ')' BLOCO FUNCOES
                     { $$.c = $1.t.nome + " " + $2.v + $3.v + $4.c + $5.v + "\n{" + $6.c + "}\n\n" + $7.c; }
          | /* epsylon */
                     { $$.c = ""; }
          ;
+         
+NOME_FUNC : _TK_ID
+              {scope = $1.v; $$ = $1;}
+          ;
 
 ARGUMENTOS : TIPO _TK_ID ',' ARGUMENTOS 
                 { $$.c = $1.t.nome + " " + $2.v + $3.v + " " + $4.c; }
@@ -206,7 +217,7 @@ CASE : _TK_CASE  _TK_ID    ':' BLOCO_CASE
      ;
 
 VAR_ARRAY : TIPO '[' ']' _TK_ID ARRAY
-                 { gerarDeclaracaoVariavel( tsGlobais, &$$, $1, $2 ); }
+                 { gerarDeclaracaoVariavel( &$$, $1, $2 ); }
           ;
 
 ARRAY : '[' _C_INT ']' ARRAY
@@ -216,9 +227,9 @@ ARRAY : '[' _C_INT ']' ARRAY
       ;
 
 VAR : VAR ',' _TK_ID
-        { gerarDeclaracaoVariavel( tsGlobais, &$$, $1, $3 ); }
+        { gerarDeclaracaoVariavel( &$$, $1, $3 ); }
     | TIPO _TK_ID
-        { gerarDeclaracaoVariavel( tsGlobais ,&$$, $1, $2 ); }
+        { gerarDeclaracaoVariavel( &$$, $1, $2 ); }
     ;
     
 TIPO : _TK_INT      { $$ = $1; }
@@ -234,7 +245,7 @@ CHAMA_FUNC : _TK_ID '(' PARAMETROS ')'
 	       ;     
 	       
 ATR : _TK_ID '=' EXP
-            { gerarCodigo_Atribuicao(tsGlobais, &$$, &$1, $3); }
+            { gerarCodigo_Atribuicao(&$$, &$1, $3); }
     | _TK_ID '[' EXP ']' '=' EXP 
             { $$.c = $6.c + $3.c + "    " + $1.v + $2.v + $3.v + $4.v + $3.c + " = " + $6.v + ";\n"; }
     ;
@@ -284,7 +295,7 @@ EXP_UNARIA : _OP_INC EXP
                 { gerarCodigo_EXP_UNARIA(&$$, $1, $2); }
            ;
 
-F : _TK_ID       { testarSeVariavelFoiDeclarada(tsGlobais, &$$, $1); }	
+F : _TK_ID       { gerarCodigo_F_para_TK_ID(&$$, $1); }	
   | _C_INT       { $$ = $1; }
   | _C_DOUBLE    { $$ = $1; }
   | _C_BOOL      { $$ = $1; }
@@ -334,20 +345,30 @@ Tipo tipoResultado( Tipo a, string operador, Tipo b )
   return resultadoOperacao[a.nome + operador + b.nome];
 }
 
-void gerarCodigo_Atribuicao(TS& ts, Atributo *SS, Atributo *S1, Atributo S3)
+void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, Atributo S3)
 {
-    if (!buscarVariavelTS( ts, S1->v, &SS->t )) 
+    bool varEhGlobal = buscarVariavelTS( tsGlobais, S1->v);
+
+    if (!varEhGlobal && !buscarVariavelTS(fs[scope], S1->v)) 
     {
          erro( "Variavel nao declarada: " + S1->v );
     }
-    
-    S1->t = ts[S1->v];
-    
+       
+    if (varEhGlobal) 
+    {
+        S1->t = tsGlobais[S1->v];
+    }
+    else
+    {
+        S1->t = fs[scope][S1->v];
+    }
+
     if (S1->t.nome == S3.t.nome ) 
     {
         if (S1->t.nome == "string") 
         {
             SS->c = S3.c + "    strcpy(" + S1->v + ", " + S3.v + ");\n";
+            SS->t = S1->t;
         }
         else 
         {
@@ -385,8 +406,10 @@ void gerarCodigo_EXP_UNARIA(Atributo *atr, Atributo atr1 , Atributo atr2)
     atr->c = atr2.c + "    " + atr->v + " = " + atr1.v + atr2.v + ";\n";
 }
 
-bool buscarVariavelTS( TS& ts, string nomeVar, Tipo* tipo ) {
-  if( ts.find( nomeVar ) != ts.end() ) {
+bool buscarVariavelTS( TS& ts, string nomeVar, Tipo* tipo )
+{
+  if( ts.find( nomeVar ) != ts.end() ) 
+  {
     *tipo = ts[ nomeVar ];
     return true;
   }
@@ -394,20 +417,90 @@ bool buscarVariavelTS( TS& ts, string nomeVar, Tipo* tipo ) {
     return false;
 }
 
-void gerarDeclaracaoVariavel(TS& ts, Atributo* SS, const Atributo& tipo, const Atributo& id ) {
-  SS->v = "";
-  SS->t = tipo.t;
-  
-  inserirVariavelTS( ts, id.v, tipo.t );
+bool buscarVariavelTS( TS& ts, string nomeVar )
+{
+  if( ts.find( nomeVar ) != ts.end() ) 
+  {
+    return true;
+  }
+  else
+    return false;
+}
 
-  if( tipo.t.nome == "string" ) {
-    SS->c = tipo.c + "    " +
-           "char " + id.v + "["+ toStr( MAX_STRING ) +"];\n";   
-  }
-  else {
-    SS->c = tipo.c + "    " +
-            tipo.t.nome + " " + id.v + ";\n";
-  }
+void gerarDeclaracaoVariavel(Atributo* SS, const Atributo& tipo, const Atributo& id )
+{
+    SS->v = "";
+    SS->t = tipo.t;
+
+    if (verificarSeVariavelFoiDeclarada(id.v)) 
+    {
+        erro( "Redeclaração da variavel: " + id.v );
+    }
+
+    inserirVariavelTS(id.v, tipo.t );
+
+    if( tipo.t.nome == "string" ) 
+    {
+        SS->c = tipo.c + "    " +
+               "char " + id.v + "["+ toStr( MAX_STRING ) +"];\n";   
+    }
+    else 
+    {
+        SS->c = tipo.c + "    " +
+                tipo.t.nome + " " + id.v + ";\n";
+    }
+}
+
+void inserirVariavelTS(string nomeVar, Tipo tipo ) 
+{
+    if (scope == "global") 
+    {
+        if( !buscarVariavelTS( tsGlobais, nomeVar, &tipo ))
+        {
+            tsGlobais[nomeVar] = tipo;
+            return;
+        }
+        else  
+        {
+            erro( "Variavel já definida: " + nomeVar );
+        }
+    }
+
+    if( !buscarVariavelTS( tsGlobais, nomeVar, &tipo ) && !buscarVariavelTS(fs[scope], nomeVar, &tipo))
+    {
+        fs[scope][nomeVar] = tipo;
+    }
+    else  
+    {
+        erro( "Variavel já definida: " + nomeVar );
+    }
+}
+
+bool verificarSeVariavelFoiDeclarada(string nomeVar)
+{
+    if( buscarVariavelTS( tsGlobais, nomeVar) || buscarVariavelTS(fs[scope], nomeVar) )  
+    {
+        return true;
+    }
+    return false;
+}
+
+void gerarCodigo_F_para_TK_ID(Atributo *atr, Atributo atr1) 
+{
+    if (buscarVariavelTS(tsGlobais, atr1.v))
+    {
+        atr->v = atr1.v;
+        atr->t = tsGlobais[atr->v];
+        return;
+    }
+
+    if( buscarVariavelTS(fs[scope], atr1.v) )  
+    {
+        atr->v = atr1.v;
+        atr->t = fs[scope][atr->v];
+        return;
+    }
+    erro( "Variavel nao declarada: " + atr1.v );
 }
 
 string gerarDeclaracaoVariaveisTemporarias() {
@@ -432,22 +525,6 @@ string gerarDeclaracaoVariaveisTemporarias() {
         c += "char temp_string_" + toStr( i + 1 ) + "[" + toStr( MAX_STRING )+ "];\n";
 
     return c;  
-}
-
-void inserirVariavelTS( TS& ts, string nomeVar, Tipo tipo ) 
-{
-    if( !buscarVariavelTS( ts, nomeVar, &tipo ) )
-        ts[nomeVar] = tipo;
-    else  
-        erro( "Variavel já definida: " + nomeVar );
-}
-
-void testarSeVariavelFoiDeclarada(TS& ts, Atributo *atr, Atributo atr1) 
-{
-    if( buscarVariavelTS( tsGlobais, atr1.v, &(atr->t) ) ) 
-      atr->v = atr1.v; 
-    else
-      erro( "Variavel nao declarada: " + atr1.v );
 }
 
 string gerarTemp(Tipo tipo)
