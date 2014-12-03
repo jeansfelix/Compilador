@@ -69,10 +69,13 @@ void gerarCodigo_F_para_TK_ID(Atributo *atr, Atributo atr1);
 
 void gerarCodigoIf(Atributo *SS, Atributo exp_if, Atributo bloco_if);
 void gerarCodigoIfElse(Atributo *SS, Atributo exp_if, Atributo bloco_if, Atributo bloco_else);
-void gerarCodigoWhile();//TODO
-void gerarCodigoDoWhile();//TODO
-void gerarCodigoFor();//TODO
+
+void gerarCodigoWhile(Atributo *SS, const Atributo& condicao, const Atributo& bloco_while);
+void gerarCodigoDoWhile(Atributo *SS, const Atributo& condicao, const Atributo& bloco_while);
+void gerarCodigoFor( Atributo* SS, const Atributo& inicial, const Atributo& condicao, const Atributo& passo, const Atributo& cmds);
+
 void gerarCodigoSwitch();//TODO
+
 void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3);
 void gerarCodigo_EXP_UNARIA(Atributo *atr, Atributo atr1 , Atributo atr2);
 
@@ -166,6 +169,7 @@ BLOCO_OPCIONAL : BLOCO
                ;
 
 BLOCO_CASE : S _TK_BREAK ';'
+            { $$.c = $1.c + $2.c + $3.v; }
 	       | CASE
 	       ;
 
@@ -214,6 +218,7 @@ CMD_DOWHILE : _TK_DO BLOCO _TK_WHILE '(' EXP ')' ';'
             ;
 
 CMD_SWITCH : _TK_SWITCH '(' _TK_ID ')' '{' LST_CASE '}'
+
            ;
 
 CMD_ESCRITA : _IO_PRINT '(' F ')' ';'
@@ -230,9 +235,13 @@ LST_CASE : CASE LST_CASE
          ;
          
 CASE : _TK_CASE  _TK_ID    ':' BLOCO_CASE
+        { $$.c = $2.c + $3.v + $4.c; }
      | _TK_CASE  _C_INT    ':' BLOCO_CASE
+        { $$.c = $2.c + $3.v + $4.c; }
      | _TK_CASE  _C_CHAR   ':' BLOCO_CASE
+        { $$.c = $2.c + $3.v + $4.c; }
      | _TK_CASE  _C_STRING ':' BLOCO_CASE
+        { $$.c = $2.c + $3.v + $4.c; }
      ;
 
 VAR_ARRAY : TIPO '[' ']' _TK_ID ARRAY
@@ -412,8 +421,8 @@ void gerarCodigoIfElse(Atributo *SS, Atributo exp_if, Atributo bloco_if, Atribut
 **/
 void gerarCodigoWhile(Atributo *SS, const Atributo& condicao, 
                                     const Atributo& bloco_while){
-    string whileCond = geraLabel("while_cond"),
-            whileFim = geraLabel("while_fim");
+    string whileCond = gerarLabel("while_cond"),
+            whileFim = gerarLabel("while_fim");
     string valorNotCond = gerarTemp(Tipo("bool"));
 
     *SS = Atributo();
@@ -434,8 +443,8 @@ void gerarCodigoWhile(Atributo *SS, const Atributo& condicao,
 **/
 void gerarCodigoDoWhile(Atributo *SS, const Atributo& condicao, 
                                     const Atributo& bloco_while){
-    string whileCond = geraLabel("while_cond"),
-            whileFim = geraLabel("while_fim");
+    string whileCond = gerarLabel("while_cond"),
+            whileFim = gerarLabel("while_fim");
     string valorNotCond = gerarTemp(Tipo("bool"));
 
     *SS = Atributo();
@@ -445,8 +454,8 @@ void gerarCodigoDoWhile(Atributo *SS, const Atributo& condicao,
     SS->c = whileCond + ":\n" + condicao.c +
             " " + valorNotCond + " = !" + condicao.v + ";\n"+
             bloco_while.c + 
-            " if ( !"+valorNotCond+" ) goto "+whileCond+";\n"
-            whileFim+":\n";
+            " if ( !"+valorNotCond+" ) goto "+whileCond+";\n"+
+            whileFim +":\n";
 }
 
 /**
@@ -457,8 +466,8 @@ void gerarCodigoFor( Atributo* SS, const Atributo& inicial,
                                   const Atributo& condicao, 
                                   const Atributo& passo, 
                                   const Atributo& cmds ) {
-  string forCond = geraLabel( "for_cond" ),
-         forFim = geraLabel( "for_fim" );
+  string forCond = gerarLabel( "for_cond" ),
+         forFim = gerarLabel( "for_fim" );
   string valorNotCond = gerarTemp( Tipo( "bool" ) );
          
   *SS = Atributo();
@@ -481,6 +490,16 @@ void gerarCodigoFor( Atributo* SS, const Atributo& inicial,
 **/
 void gerarCodigoSwitch(Atributo* SS, const Atributo& comparacao,
                                      const Atributo& bloco_switch){
+    // CMD_SWITCH : _TK_SWITCH '(' _TK_ID ')' '{' LST_CASE '}'
+    //        ;
+
+    // LST_CASE : CASE LST_CASE
+    //          | _TK_DEFAULT ':' S _TK_BREAK ';'
+    //          | /* epsylon */
+    //                 { $$.c = ""; }
+    //          ;
+    *SS = Atributo();
+    SS->c = "";
 
 }
 
