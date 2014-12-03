@@ -3,22 +3,25 @@ LINHA   [\n]
 NUMERO  [0-9]
 LETRA   [A-Za-z_]
 
-BOOL    ("true"|"false")
-NOT     ("!"|"not")
-DIF     ("!="|"not equal")
-IGUAL   ("=="|"equal")
-OR      ("or"|"||")
-AND     ("and"|"&&")
-INT     {NUMERO}+
-DOUBLE  {NUMERO}+("."{NUMERO}+)
-STRING  (\"([^"]|\\\")*\")
+COMETARIO "/*"(.+)"*/"
+BOOL      ("true"|"false")
+NOT       ("!"|"not")
+DIF       ("!="|"not equal")
+IGUAL     ("=="|"equal")
+OR        ("or"|"||")
+AND       ("and"|"&&")
+INT       {NUMERO}+
+DOUBLE    {NUMERO}+("."{NUMERO}+)
+STRING    (\"([^"]|\\\")*\")
 
 ID      {LETRA}({LETRA}|{NUMERO})*
+
 
 %%
 
 {LINHA}    { nlinha++; }
 {DELIM}    {}
+{COMETARIO}
 
 %{ /* Comandos */ %}
     "if"       { yylval = Atributo( yytext ); return _TK_IF; }
@@ -53,7 +56,7 @@ ID      {LETRA}({LETRA}|{NUMERO})*
     "--"        {  yylval = Atributo( yytext ); return _OP_DEC; }
 
 %{ /* Constantes */ %}
-    {BOOL}     { std::string s = "true"; yylval = Atributo( !s.compare(yytext)? "1" : "0", "boolean"); return _C_BOOL; }
+    {BOOL}     { string s = "true"; yylval = Atributo( !s.compare(yytext)? "1" : "0", "boolean"); return _C_BOOL; }
     {INT}      { yylval = Atributo( yytext, "int" ); return _C_INT; }
     {DOUBLE}   { yylval = Atributo( yytext, "double" ); return _C_DOUBLE; }
     {STRING}   { yylval = Atributo( yytext, "string" ); return _C_STRING; }
