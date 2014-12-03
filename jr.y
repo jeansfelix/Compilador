@@ -582,7 +582,7 @@ void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3
                                  + "    strncpy(" + temp + ", " + atr1Value + ", " + toStr(MAX_STRING - 1) + ");\n"
                                  + "    " + temp + "[" + toStr(MAX_STRING - 1) + "] = 0;\n"
                                  + "    strncat( " + temp + ", " + atr3Value + ", " + toStr(MAX_STRING - 1)
-                                 + " - " + "strlen(" + atr1.v + ")" + " );\n"
+                                 + " - " + "strlen(" + atr1Value + ")" + " );\n"
                                  + "    strncpy(" + atr->v + ", " + temp + ", " + toStr(MAX_STRING - 1) + ");\n" 
                                  + "    " + atr->v + "[" + toStr(MAX_STRING - 1) + "] = 0;\n"
                                  ;

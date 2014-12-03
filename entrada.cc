@@ -4,11 +4,12 @@ string b;
 
 int main()
 {
-    b = "casa";
+    int a;
     
-    b = b + 1 + 2 + 3 + b;
-    
-    print(b + "\n");
+    for (a = 0; a<4 ; a = a + 1)
+    {
+        print(a + "\n");
+    }
     
     return 0;
 }
