@@ -9,6 +9,7 @@ Nome: Jean Da Silva Felix; DRE: 111318920
 #include <stdlib.h>
 #include <iostream>
 #include <map>
+#include <vector>
 
 using namespace std;
 
@@ -27,14 +28,14 @@ struct Atributo {
   string v;  // Valor
   Tipo t;    // Tipo
   string c;  // Codigo
-  string label;
+  string fimLoop;
   
   Atributo() {}  // inicializacao automatica para vazio ""
-  Atributo( string v, string t = "", string c = "", string label = "") {
+  Atributo( string v, string t = "", string c = "", string fimLoop = "") {
     this->v = v;
     this->t.nome = t;
     this->c = c;
-    this->label = label;
+    this->fimLoop = fimLoop;
   }
 };
 
@@ -43,6 +44,7 @@ typedef map< string, TS > FunctionScopes;
 
 TS tsGlobais;
 FunctionScopes fs;
+vector<string> pilhaFimLoop;
 
 string scope = "global";
 
@@ -70,9 +72,10 @@ void gerarCodigo_F_para_TK_ID(Atributo *atr, Atributo atr1);
 void gerarCodigoIf(Atributo *SS, Atributo exp_if, Atributo bloco_if);
 void gerarCodigoIfElse(Atributo *SS, Atributo exp_if, Atributo bloco_if, Atributo bloco_else);
 
-void gerarCodigoWhile(Atributo *SS, const Atributo& condicao, const Atributo& bloco_while);
-void gerarCodigoDoWhile(Atributo *SS, const Atributo& condicao, const Atributo& bloco_while);
-void gerarCodigoFor( Atributo* SS, const Atributo& inicial, const Atributo& condicao, const Atributo& passo, const Atributo& cmds);
+string gerarCodigoBreak();
+void gerarCodigoWhile(Atributo *SS, const string fim_while, const Atributo& condicao, const Atributo& bloco_while);
+void gerarCodigoDoWhile(Atributo *SS, const string fim_dowhile, const Atributo& condicao, const Atributo& bloco_while);
+void gerarCodigoFor( Atributo* SS, const string fim_for,const Atributo& inicial, const Atributo& condicao, const Atributo& passo, const Atributo& cmds);
 
 void gerarCodigoSwitch();//TODO
 
@@ -145,18 +148,6 @@ PARAMETROS : EXP ',' PARAMETROS
                 { $$.c = ""; }
            ;
 
-S : VAR ';' S 
-        { $$.c = $1.c + "\n" + $3.c; }
-  | VAR_ARRAY ';' S
-        { $$.c = $1.c + "\n" + $3.c; }
-  | ATR ';' S 
-        { $$.c = $1.c + $3.c; }
-  | COMANDO S 
-        { $$.c = $1.c + $2.c; }
-  | /* epsylon */
-        { $$.c = ""; }
-  ;
-
 BLOCO : '{' S '}' {$$.c = $2.c;}
       ;
 
@@ -166,12 +157,28 @@ BLOCO_OPCIONAL : BLOCO
                     { $$.c = $1.c; }
                | COMANDO 
                     { $$.c = $1.c; }
+               | _TK_BREAK ';'
+                    { $$.c = gerarCodigoBreak(); }
                ;
 
 BLOCO_CASE : S _TK_BREAK ';'
-            { $$.c = $1.c + $2.c + $3.v; }
+               { $$.c = $1.c + gerarCodigoBreak(); }
 	       | CASE
 	       ;
+
+S : VAR ';' S 
+        { $$.c = $1.c + "\n" + $3.c; }
+  | VAR_ARRAY ';' S
+        { $$.c = $1.c + "\n" + $3.c; }
+  | ATR ';' S 
+        { $$.c = $1.c + $3.c; }
+  | COMANDO S 
+        { $$.c = $1.c + $2.c; }
+  | _TK_BREAK ';'
+         { $$.c = gerarCodigoBreak(); }
+  | /* epsylon */
+        { $$.c = ""; }
+  ;
 
 COMANDO : CMD_IF
             {$$ = $1;}
@@ -205,24 +212,35 @@ CMD_IF : _TK_IF '(' EXP ')' BLOCO_OPCIONAL  %prec _PRECEDENCIA_ELSE
                                   { gerarCodigoIfElse(&$$, $3, $5, $7); }
        ;
 
-CMD_FOR : _TK_FOR '(' ATR ';' EXP ';' ATR ')' BLOCO_OPCIONAL
-        { gerarCodigoFor(&$$, $3, $5, $7, $9); }
+LOOP_WHILE : _TK_WHILE
+               {pilhaFimLoop.push_back($1.fimLoop);}
+           ;
+LOOP_DOWHILE : _TK_DO
+                 {pilhaFimLoop.push_back($1.fimLoop);}
+             ;
+            
+LOOP_FOR : _TK_FOR
+             {pilhaFimLoop.push_back($1.fimLoop);}
+         ;
+
+CMD_FOR : LOOP_FOR '(' ATR ';' EXP ';' ATR ')' BLOCO_OPCIONAL
+        { gerarCodigoFor(&$$, $1.fimLoop, $3, $5, $7, $9); }
         ;
 
-CMD_WHILE : _TK_WHILE '(' EXP ')' BLOCO_OPCIONAL
-            { gerarCodigoWhile(&$$, $3, $5); }
+CMD_WHILE : LOOP_WHILE '(' EXP ')' BLOCO_OPCIONAL
+            { gerarCodigoWhile(&$$, $1.fimLoop, $3, $5); }
           ;
 
-CMD_DOWHILE : _TK_DO BLOCO _TK_WHILE '(' EXP ')' ';'
-            { gerarCodigoDoWhile(&$$, $4, $1); }
+CMD_DOWHILE : LOOP_DOWHILE BLOCO _TK_WHILE '(' EXP ')' ';'
+            { gerarCodigoDoWhile(&$$, $1.fimLoop, $5, $2); }
             ;
 
 CMD_SWITCH : _TK_SWITCH '(' _TK_ID ')' '{' LST_CASE '}'
 
            ;
 
-CMD_ESCRITA : _IO_PRINT '(' F ')' ';'
-                    { $$.c = "    printf(\"%s\"," + $3.v + ");\n"; }
+CMD_ESCRITA : _IO_PRINT '(' EXP ')' ';'
+                    { $$.c = $3.c + "    printf(\"%s\"," + $3.v + ");\n"; }
 	        ;
 			
 CMD_LEITURA : _IO_SCAN '(' _TK_ID ')' ';'
@@ -369,35 +387,6 @@ Tipo tipoResultado( Tipo a, string operador, Tipo b ){
   return resultadoOperacao[a.nome + operador + b.nome];
 }
 
-void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, Atributo S3){
-    bool varEhGlobal = buscarVariavelTS( tsGlobais, S1->v);
-
-    if (!varEhGlobal && !buscarVariavelTS(fs[scope], S1->v)){
-         erro( "Variavel nao declarada: " + S1->v );
-    }
-       
-    if (varEhGlobal){
-        S1->t = tsGlobais[S1->v];
-    }
-    else{
-        S1->t = fs[scope][S1->v];
-    }
-
-    if (S1->t.nome == S3.t.nome ){
-        if (S1->t.nome == "string"){
-            SS->c = S3.c + "    strcpy(" + S1->v + ", " + S3.v + ");\n";
-            SS->t = S1->t;
-        }
-        else{
-            SS->c = S3.c + "    " + S1->v + " = " + S3.v + ";\n";
-            SS->t = S1->t;
-        }
-    }
-    else{
-        erro("Tipo " +  S3.t.nome + " não pode ser atribuído a " + S1->t.nome + " \n");
-    }
-}
-
 void gerarCodigoIf(Atributo *SS, Atributo exp_if, Atributo bloco_if){
     string label_if_false = gerarLabel("if_false"); 
     string temp = gerarTemp(Tipo("boolean"));
@@ -415,25 +404,32 @@ void gerarCodigoIfElse(Atributo *SS, Atributo exp_if, Atributo bloco_if, Atribut
              bloco_if.c + label_fim_if_else + ":\n";
 }
 
+string gerarCodigoBreak() 
+{
+    string codigoBreak;
+    codigoBreak = "    goto " + pilhaFimLoop.back() + ";\n";
+    pilhaFimLoop.pop_back();
+    
+    return codigoBreak;
+}
+
 /**
     Criando o código do while
     solução baseada na construção do 'for'
 **/
-void gerarCodigoWhile(Atributo *SS, const Atributo& condicao, 
+void gerarCodigoWhile(Atributo *SS, const string fim_while, const Atributo& condicao, 
                                     const Atributo& bloco_while){
-    string whileCond = gerarLabel("while_cond"),
-            whileFim = gerarLabel("while_fim");
+    string whileCond = gerarLabel("while_cond");
     string valorNotCond = gerarTemp(Tipo("boolean"));
 
-    *SS = Atributo();
     if( condicao.t.nome != "boolean" )
         erro( "A expressão de teste deve ser booleana: " + condicao.t.nome );
 
     SS->c = whileCond + ":\n" + condicao.c +
-            " " + valorNotCond + " = !" + condicao.v + ";\n"+
-            " if ( "+valorNotCond+" ) goto "+whileFim+";\n"+
-            bloco_while.c + " goto "+whileCond+";\n"+
-            whileFim+":\n";
+            "    " + valorNotCond + " = !" + condicao.v + ";\n"+
+            "    if ( "+valorNotCond+" ) goto "+ fim_while +";\n"+
+            bloco_while.c + "    goto "+whileCond+";\n"+
+            fim_while+":\n";
 }
 
 /**
@@ -441,48 +437,43 @@ void gerarCodigoWhile(Atributo *SS, const Atributo& condicao,
     usei como base o while para a construção.
     apenas 'inverti' a variavel valorNotCond
 **/
-void gerarCodigoDoWhile(Atributo *SS, const Atributo& condicao, 
+void gerarCodigoDoWhile(Atributo *SS, const string fim_dowhile, const Atributo& condicao, 
                                     const Atributo& bloco_while){
-    string whileCond = gerarLabel("while_cond"),
-            whileFim = gerarLabel("while_fim");
+    string whileCond = gerarLabel("while_cond");
     string valorNotCond = gerarTemp(Tipo("boolean"));
 
-    *SS = Atributo();
     if( condicao.t.nome != "boolean" )
         erro( "A expressão de teste deve ser booleana: " + condicao.t.nome );
 
     SS->c = whileCond + ":\n" + condicao.c +
-            " " + valorNotCond + " = !" + condicao.v + ";\n"+
+            "    " + valorNotCond + " = !" + condicao.v + ";\n"+
             bloco_while.c + 
-            " if ( !"+valorNotCond+" ) goto "+whileCond+";\n"+
-            whileFim +":\n";
+            "    if ( !"+valorNotCond+" ) goto "+whileCond+";\n"+
+            fim_dowhile +":\n";
 }
 
 /**
     Criando o código do 'for'
     solução baseada na apresentada em aula
 **/
-void gerarCodigoFor( Atributo* SS, const Atributo& inicial, 
-                                  const Atributo& condicao, 
-                                  const Atributo& passo, 
+void gerarCodigoFor( Atributo* SS, const string fim_for, const Atributo& inicial, 
+                                  const Atributo& condicao, const Atributo& passo, 
                                   const Atributo& cmds ) {
-  string forCond = gerarLabel( "for_cond" ),
-         forFim = gerarLabel( "for_fim" );
+  string forCond = gerarLabel( "for_cond" );
   string valorNotCond = gerarTemp( Tipo( "boolean" ) );
          
-  *SS = Atributo();
   if( condicao.t.nome != "boolean" )
     erro( "A expressão de teste deve ser booleana: " + condicao.t.nome ); 
   
   // Funciona apenas para filtro, sem pipe que precisa de buffer 
   // (sort, por exemplo, não funciona)
   SS->c = inicial.c + forCond + ":\n" + condicao.c +
-          "  " + valorNotCond + " = !" + condicao.v + ";\n" +
-          "  if( " + valorNotCond + " ) goto " + forFim + ";\n" +
+          "    " + valorNotCond + " = !" + condicao.v + ";\n" +
+          "    if( " + valorNotCond + " ) goto " + fim_for + ";\n" +
           cmds.c +
           passo.c +
-          "  goto " + forCond + ";\n" + 
-          forFim + ":\n";
+          "    goto " + forCond + ";\n" + 
+          fim_for + ":\n";
 }
 
 /**
@@ -503,11 +494,106 @@ void gerarCodigoSwitch(Atributo* SS, const Atributo& comparacao,
 
 }
 
+void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, Atributo S3){
+    bool varEhGlobal = buscarVariavelTS( tsGlobais, S1->v);
+
+    if (!varEhGlobal && !buscarVariavelTS(fs[scope], S1->v)){
+         erro( "Variavel nao declarada: " + S1->v );
+    }
+       
+    if (varEhGlobal){
+        S1->t = tsGlobais[S1->v];
+    }
+    else{
+        S1->t = fs[scope][S1->v];
+    }
+
+    if (S1->t.nome == S3.t.nome ){
+        string max = toStr(MAX_STRING - 1);
+    
+        if (S1->t.nome == "string"){
+            SS->c = S1->c + S3.c + "    strncpy(" + S1->v + ", " + S3.v + ", " + max + ");\n" + 
+                           "    " + S1->v + "[" + max + "]" + " = 0;\n";
+            SS->t = S1->t;
+        }
+        else{
+            SS->c = S3.c + "    " + S1->v + " = " + S3.v + ";\n";
+            SS->t = S1->t;
+        }
+    }
+    else{
+        erro("Tipo " +  S3.t.nome + " não pode ser atribuído a " + S1->t.nome + " \n");
+    }
+}
+
 void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3){
     atr->t = tipoResultado( atr1.t, atr2.v, atr3.t );
+    
+    if (atr->t.nome == "string") 
+    {
+        string atr1Value;
+        string atr3Value;
+        
+        string temp_atr1;
+        string temp_atr3;
+        
+        string cod_aux;
+        
+        /* Caso um dia eu queira otimizar é só tornar o char[256] em char * x ; x = malloc(256)
+         * e adicionar este cod_free ao fim dessa geração.
+         */
+        string cod_free;
+     
+        if (atr1.t.nome == "string" && atr3.t.nome == "string") 
+        {
+            atr1Value = atr1.v;
+            atr3Value = atr3.v;
+        }
+        else if ( atr1.t.nome == "string" && atr3.t.nome == "int" ) 
+        {
+            atr1Value = atr1.v;
+            
+            temp_atr3 = gerarTemp(Tipo("string"));
+            
+            cod_aux = "    sprintf(" + temp_atr3 + ",\"%d\", " + atr3.v + ");\n";
+
+            atr3Value = temp_atr3;
+            
+            cod_free = "    free(" + temp_atr3 + ");\n";
+        }
+        else if ( atr1.t.nome == "int" && atr3.t.nome == "string" ) 
+        {
+            atr3Value = atr3.v;
+            
+            temp_atr1 = gerarTemp(Tipo("string"));
+            
+            cod_aux = "    sprintf(" + temp_atr1 + ",\"%d\", " + atr1.v + ");\n";
+
+            atr1Value = temp_atr1;
+            
+            cod_free = "    free(" + temp_atr1 + ");\n";
+        }
+        
+        
+        string temp = gerarTemp(atr->t);
+        atr->v = gerarTemp(atr->t);      
+        
+        atr->c = atr1.c + atr3.c + cod_aux
+                                 + "    strncpy(" + temp + ", " + atr1Value + ", " + toStr(MAX_STRING - 1) + ");\n"
+                                 + "    " + temp + "[" + toStr(MAX_STRING - 1) + "] = 0;\n"
+                                 + "    strncat( " + temp + ", " + atr3Value + ", " + toStr(MAX_STRING - 1)
+                                 + " - " + "strlen(" + atr1.v + ")" + " );\n"
+                                 + "    strncpy(" + atr->v + ", " + temp + ", " + toStr(MAX_STRING - 1) + ");\n" 
+                                 + "    " + atr->v + "[" + toStr(MAX_STRING - 1) + "] = 0;\n"
+                                 ;
+        return;
+    }
+    
     atr->v = gerarTemp(atr->t);
     atr->c = atr1.c + atr3.c + "    " + atr->v + " = " + atr1.v + " " + atr2.v + " " + atr3.v + ";\n";
 }
+
+
 
 void gerarCodigo_EXP_UNARIA(Atributo *atr, Atributo atr1 , Atributo atr2){
     atr->t = tipoResultado( Tipo(""), atr1.v, atr2.t );

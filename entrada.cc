@@ -1,31 +1,15 @@
+/* Eu me amo. */
+
 string b;
 
 int main()
 {
-    b = "";
+    b = "casa";
     
-    if (false){
-        b = "1";
-    }
-    else{
-        b = "2";
-    }
+    b = b + 1 + 2 + 3 + b;
     
-    print(b);
-
-    a = 10;
-
-    for ( a=2 ; a < 3 ; a = a + 1){
-	    b = 1;
-    }
-
-    while(true){
-        a++;
-        if(a==10){
-            break;
-        }
-    }
-        
+    print(b + "\n");
+    
     return 0;
 }
 
