@@ -423,10 +423,10 @@ void gerarCodigoWhile(Atributo *SS, const Atributo& condicao,
                                     const Atributo& bloco_while){
     string whileCond = gerarLabel("while_cond"),
             whileFim = gerarLabel("while_fim");
-    string valorNotCond = gerarTemp(Tipo("bool"));
+    string valorNotCond = gerarTemp(Tipo("boolean"));
 
     *SS = Atributo();
-    if( condicao.t.nome != "bool" )
+    if( condicao.t.nome != "boolean" )
         erro( "A expressão de teste deve ser booleana: " + condicao.t.nome );
 
     SS->c = whileCond + ":\n" + condicao.c +
@@ -445,10 +445,10 @@ void gerarCodigoDoWhile(Atributo *SS, const Atributo& condicao,
                                     const Atributo& bloco_while){
     string whileCond = gerarLabel("while_cond"),
             whileFim = gerarLabel("while_fim");
-    string valorNotCond = gerarTemp(Tipo("bool"));
+    string valorNotCond = gerarTemp(Tipo("boolean"));
 
     *SS = Atributo();
-    if( condicao.t.nome != "bool" )
+    if( condicao.t.nome != "boolean" )
         erro( "A expressão de teste deve ser booleana: " + condicao.t.nome );
 
     SS->c = whileCond + ":\n" + condicao.c +
@@ -468,10 +468,10 @@ void gerarCodigoFor( Atributo* SS, const Atributo& inicial,
                                   const Atributo& cmds ) {
   string forCond = gerarLabel( "for_cond" ),
          forFim = gerarLabel( "for_fim" );
-  string valorNotCond = gerarTemp( Tipo( "bool" ) );
+  string valorNotCond = gerarTemp( Tipo( "boolean" ) );
          
   *SS = Atributo();
-  if( condicao.t.nome != "bool" )
+  if( condicao.t.nome != "boolean" )
     erro( "A expressão de teste deve ser booleana: " + condicao.t.nome ); 
   
   // Funciona apenas para filtro, sem pipe que precisa de buffer 
