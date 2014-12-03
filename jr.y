@@ -69,6 +69,10 @@ void gerarCodigo_F_para_TK_ID(Atributo *atr, Atributo atr1);
 
 void gerarCodigoIf(Atributo *SS, Atributo exp_if, Atributo bloco_if);
 void gerarCodigoIfElse(Atributo *SS, Atributo exp_if, Atributo bloco_if, Atributo bloco_else);
+void gerarCodigoWhile();//TODO
+void gerarCodigoDoWhile();//TODO
+void gerarCodigoFor();//TODO
+void gerarCodigoSwitch();//TODO
 void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3);
 void gerarCodigo_EXP_UNARIA(Atributo *atr, Atributo atr1 , Atributo atr2);
 
@@ -198,12 +202,15 @@ CMD_IF : _TK_IF '(' EXP ')' BLOCO_OPCIONAL  %prec _PRECEDENCIA_ELSE
        ;
 
 CMD_FOR : _TK_FOR '(' ATR ';' EXP ';' ATR ')' BLOCO_OPCIONAL
+        { gerarCodigoFor(&$$, $3, $5, $7, $9); }
         ;
 
 CMD_WHILE : _TK_WHILE '(' EXP ')' BLOCO_OPCIONAL
+            { gerarCodigoWhile(&$$, $3, $5); }
           ;
 
 CMD_DOWHILE : _TK_DO BLOCO _TK_WHILE '(' EXP ')' ';'
+            { gerarCodigoDoWhile(&$$, $4, $1); }
             ;
 
 CMD_SWITCH : _TK_SWITCH '(' _TK_ID ')' '{' LST_CASE '}'
@@ -328,14 +335,12 @@ map<string,int> n_label;
 
 int yyparse();
 
-void erro( string msg )
-{
+void erro( string msg ){
   yyerror( msg.c_str() );
   exit(0);
 }
 
-string toStr( int n )
-{
+string toStr( int n ){
   char buf[1024] = "";
   
   sprintf( buf, "%d", n );
@@ -343,59 +348,48 @@ string toStr( int n )
   return buf;
 }
 
-void yyerror( const char* st )
-{
+void yyerror( const char* st ){
   puts( st );
   printf( "Linha: %d\nPerto de: '%s'\n", nlinha, yytext );
 }
 
-Tipo tipoResultado( Tipo a, string operador, Tipo b ) 
-{
+Tipo tipoResultado( Tipo a, string operador, Tipo b ){
   if( resultadoOperacao.find( a.nome + operador + b.nome ) == resultadoOperacao.end() )
     erro( "Operacao nao permitida: " + a.nome + operador + b.nome );
 
   return resultadoOperacao[a.nome + operador + b.nome];
 }
 
-void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, Atributo S3)
-{
+void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, Atributo S3){
     bool varEhGlobal = buscarVariavelTS( tsGlobais, S1->v);
 
-    if (!varEhGlobal && !buscarVariavelTS(fs[scope], S1->v)) 
-    {
+    if (!varEhGlobal && !buscarVariavelTS(fs[scope], S1->v)){
          erro( "Variavel nao declarada: " + S1->v );
     }
        
-    if (varEhGlobal) 
-    {
+    if (varEhGlobal){
         S1->t = tsGlobais[S1->v];
     }
-    else
-    {
+    else{
         S1->t = fs[scope][S1->v];
     }
 
-    if (S1->t.nome == S3.t.nome ) 
-    {
-        if (S1->t.nome == "string") 
-        {
+    if (S1->t.nome == S3.t.nome ){
+        if (S1->t.nome == "string"){
             SS->c = S3.c + "    strcpy(" + S1->v + ", " + S3.v + ");\n";
             SS->t = S1->t;
         }
-        else 
-        {
+        else{
             SS->c = S3.c + "    " + S1->v + " = " + S3.v + ";\n";
             SS->t = S1->t;
         }
     }
-    else
-    {
+    else{
         erro("Tipo " +  S3.t.nome + " não pode ser atribuído a " + S1->t.nome + " \n");
     }
 }
 
-void gerarCodigoIf(Atributo *SS, Atributo exp_if, Atributo bloco_if)
-{
+void gerarCodigoIf(Atributo *SS, Atributo exp_if, Atributo bloco_if){
     string label_if_false = gerarLabel("if_false"); 
     string temp = gerarTemp(Tipo("boolean"));
     
@@ -403,8 +397,7 @@ void gerarCodigoIf(Atributo *SS, Atributo exp_if, Atributo bloco_if)
              bloco_if.c + label_if_false + ":\n";
 }
 
-void gerarCodigoIfElse(Atributo *SS, Atributo exp_if, Atributo bloco_if, Atributo bloco_else)
-{
+void gerarCodigoIfElse(Atributo *SS, Atributo exp_if, Atributo bloco_if, Atributo bloco_else){
     string label_if_true        = gerarLabel("if_true");
     string label_fim_if_else    = gerarLabel("fim_if_else");
     
@@ -413,24 +406,98 @@ void gerarCodigoIfElse(Atributo *SS, Atributo exp_if, Atributo bloco_if, Atribut
              bloco_if.c + label_fim_if_else + ":\n";
 }
 
-void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3) 
-{
+/**
+    Criando o código do while
+    solução baseada na construção do 'for'
+**/
+void gerarCodigoWhile(Atributo *SS, const Atributo& condicao, 
+                                    const Atributo& bloco_while){
+    string whileCond = geraLabel("while_cond"),
+            whileFim = geraLabel("while_fim");
+    string valorNotCond = gerarTemp(Tipo("bool"));
+
+    *SS = Atributo();
+    if( condicao.t.nome != "bool" )
+        erro( "A expressão de teste deve ser booleana: " + condicao.t.nome );
+
+    SS->c = whileCond + ":\n" + condicao.c +
+            " " + valorNotCond + " = !" + condicao.v + ";\n"+
+            " if ( "+valorNotCond+" ) goto "+whileFim+";\n"+
+            bloco_while.c + " goto "+whileCond+";\n"+
+            whileFim+":\n";
+}
+
+/**
+    Criando o codigo do 'do while'
+    usei como base o while para a construção.
+    apenas 'inverti' a variavel valorNotCond
+**/
+void gerarCodigoDoWhile(Atributo *SS, const Atributo& condicao, 
+                                    const Atributo& bloco_while){
+    string whileCond = geraLabel("while_cond"),
+            whileFim = geraLabel("while_fim");
+    string valorNotCond = gerarTemp(Tipo("bool"));
+
+    *SS = Atributo();
+    if( condicao.t.nome != "bool" )
+        erro( "A expressão de teste deve ser booleana: " + condicao.t.nome );
+
+    SS->c = whileCond + ":\n" + condicao.c +
+            " " + valorNotCond + " = !" + condicao.v + ";\n"+
+            bloco_while.c + 
+            " if ( !"+valorNotCond+" ) goto "+whileCond+";\n"
+            whileFim+":\n";
+}
+
+/**
+    Criando o código do 'for'
+    solução baseada na apresentada em aula
+**/
+void gerarCodigoFor( Atributo* SS, const Atributo& inicial, 
+                                  const Atributo& condicao, 
+                                  const Atributo& passo, 
+                                  const Atributo& cmds ) {
+  string forCond = geraLabel( "for_cond" ),
+         forFim = geraLabel( "for_fim" );
+  string valorNotCond = gerarTemp( Tipo( "bool" ) );
+         
+  *SS = Atributo();
+  if( condicao.t.nome != "bool" )
+    erro( "A expressão de teste deve ser booleana: " + condicao.t.nome ); 
+  
+  // Funciona apenas para filtro, sem pipe que precisa de buffer 
+  // (sort, por exemplo, não funciona)
+  SS->c = inicial.c + forCond + ":\n" + condicao.c +
+          "  " + valorNotCond + " = !" + condicao.v + ";\n" +
+          "  if( " + valorNotCond + " ) goto " + forFim + ";\n" +
+          cmds.c +
+          passo.c +
+          "  goto " + forCond + ";\n" + 
+          forFim + ":\n";
+}
+
+/**
+    Construção do código do switch
+**/
+void gerarCodigoSwitch(Atributo* SS, const Atributo& comparacao,
+                                     const Atributo& bloco_switch){
+
+}
+
+void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3){
     atr->t = tipoResultado( atr1.t, atr2.v, atr3.t );
     atr->v = gerarTemp(atr->t);
     atr->c = atr1.c + atr3.c + "    " + atr->v + " = " + atr1.v + " " + atr2.v + " " + atr3.v + ";\n";
 }
 
-void gerarCodigo_EXP_UNARIA(Atributo *atr, Atributo atr1 , Atributo atr2) 
-{
+void gerarCodigo_EXP_UNARIA(Atributo *atr, Atributo atr1 , Atributo atr2){
     atr->t = tipoResultado( Tipo(""), atr1.v, atr2.t );
     atr->v = gerarTemp(atr->t); 
     atr->c = atr2.c + "    " + atr->v + " = " + atr1.v + atr2.v + ";\n";
 }
 
-bool buscarVariavelTS( TS& ts, string nomeVar, Tipo* tipo )
-{
-  if( ts.find( nomeVar ) != ts.end() ) 
-  {
+bool buscarVariavelTS( TS& ts, string nomeVar, Tipo* tipo ){
+  if( ts.find( nomeVar ) != ts.end() ){
     *tipo = ts[ nomeVar ];
     return true;
   }
@@ -438,73 +505,58 @@ bool buscarVariavelTS( TS& ts, string nomeVar, Tipo* tipo )
     return false;
 }
 
-bool buscarVariavelTS( TS& ts, string nomeVar )
-{
-  if( ts.find( nomeVar ) != ts.end() ) 
-  {
+bool buscarVariavelTS( TS& ts, string nomeVar ){
+  if( ts.find( nomeVar ) != ts.end() ){
     return true;
   }
   else
     return false;
 }
 
-void gerarDeclaracaoVariavel(Atributo* SS, const Atributo& tipo, const Atributo& id )
-{
+void gerarDeclaracaoVariavel(Atributo* SS, const Atributo& tipo, const Atributo& id ){
     SS->v = "";
 
-    if (verificarSeVariavelFoiDeclarada(id.v)) 
-    {
+    if (verificarSeVariavelFoiDeclarada(id.v)){
         erro( "Redeclaração da variavel: " + id.v );
     }
 
     inserirVariavelTS(id.v, tipo.t );
 }
 
-void inserirVariavelTS(string nomeVar, Tipo tipo ) 
-{
-    if (scope == "global") 
-    {
-        if( !buscarVariavelTS( tsGlobais, nomeVar, &tipo ))
-        {
+void inserirVariavelTS(string nomeVar, Tipo tipo ){
+    if (scope == "global"){
+        if( !buscarVariavelTS( tsGlobais, nomeVar, &tipo )){
             tsGlobais[nomeVar] = tipo;
             return;
         }
-        else  
-        {
+        else{
             erro( "Variavel já definida: " + nomeVar );
         }
     }
 
-    if( !buscarVariavelTS( tsGlobais, nomeVar, &tipo ) && !buscarVariavelTS(fs[scope], nomeVar, &tipo))
-    {
+    if( !buscarVariavelTS( tsGlobais, nomeVar, &tipo ) && !buscarVariavelTS(fs[scope], nomeVar, &tipo)){
         fs[scope][nomeVar] = tipo;
     }
-    else  
-    {
+    else{
         erro( "Variavel já definida: " + nomeVar );
     }
 }
 
-bool verificarSeVariavelFoiDeclarada(string nomeVar)
-{
-    if( buscarVariavelTS( tsGlobais, nomeVar) || buscarVariavelTS(fs[scope], nomeVar) )  
-    {
+bool verificarSeVariavelFoiDeclarada(string nomeVar){
+    if( buscarVariavelTS( tsGlobais, nomeVar) || buscarVariavelTS(fs[scope], nomeVar) ){
         return true;
     }
     return false;
 }
 
-void gerarCodigo_F_para_TK_ID(Atributo *atr, Atributo atr1) 
-{
-    if (buscarVariavelTS(tsGlobais, atr1.v))
-    {
+void gerarCodigo_F_para_TK_ID(Atributo *atr, Atributo atr1) {
+    if (buscarVariavelTS(tsGlobais, atr1.v)){
         atr->v = atr1.v;
         atr->t = tsGlobais[atr->v];
         return;
     }
 
-    if( buscarVariavelTS(fs[scope], atr1.v) )  
-    {
+    if( buscarVariavelTS(fs[scope], atr1.v) ){
         atr->v = atr1.v;
         atr->t = fs[scope][atr->v];
         return;
@@ -515,10 +567,8 @@ void gerarCodigo_F_para_TK_ID(Atributo *atr, Atributo atr1)
 string gerarDeclaracaoVariaveisGlobais() {
     string c = "";
     
-    for (std::map<string, Tipo>::iterator it=tsGlobais.begin(); it!=tsGlobais.end(); ++it)
-    {
-        if (it->second.nome != "string")
-        {
+    for (std::map<string, Tipo>::iterator it=tsGlobais.begin(); it!=tsGlobais.end(); ++it){
+        if (it->second.nome != "string"){
             c = c + it->second.nome + " " + it->first + ";\n";
         }
         else {
@@ -534,10 +584,8 @@ string gerarDeclaracaoVariaveisLocais(string escopoFuncao) {
     
     string c = "";
     
-    for (std::map<string, Tipo>::iterator it=ts.begin(); it!=ts.end(); ++it)
-    {
-        if (it->second.nome != "string")
-        {
+    for (std::map<string, Tipo>::iterator it=ts.begin(); it!=ts.end(); ++it){
+        if (it->second.nome != "string"){
             c = c + "    " + it->second.nome + " " + it->first + ";\n";
         }
         else {
@@ -572,18 +620,15 @@ string gerarDeclaracaoVariaveisTemporarias() {
     return c;  
 }
 
-string gerarTemp(Tipo tipo)
-{
+string gerarTemp(Tipo tipo){
     return "temp_" + tipo.nome + "_" + toStr( ++n_var_temp[tipo.nome] );
 }
 
-string gerarLabel(string cmd)
-{
+string gerarLabel(string cmd){
     return "LABEL_" + cmd + "_" + toStr( ++n_label[cmd] );
 }
 
-void inicializarResultadoOperacao()
-{
+void inicializarResultadoOperacao(){
   resultadoOperacao["string+string"] = Tipo("string");
   resultadoOperacao["string+int"] = Tipo("string");
   resultadoOperacao["int+string"] = Tipo("string");
@@ -607,8 +652,7 @@ void inicializarResultadoOperacao()
   resultadoOperacao["int*double"] = Tipo("double");
 }
 
-int main( int argc, char* argv[] )
-{
+int main( int argc, char* argv[] ){
     inicializarResultadoOperacao();
     yyparse();
 }
