@@ -161,7 +161,7 @@ BLOCO_OPCIONAL : BLOCO
                     { $$.c = gerarCodigoBreak(); }
                ;
 
-BLOCO_CASE : S _TK_BREAK ';'
+BLOCO_CASE : S ';'
                { $$.c = $1.c + gerarCodigoBreak(); }
 	       | CASE
 	       ;
@@ -247,7 +247,7 @@ CMD_LEITURA : _IO_SCAN '(' _TK_ID ')' ';'
 	        ;
 
 LST_CASE : CASE LST_CASE
-         | _TK_DEFAULT ':' S _TK_BREAK ';'
+         | _TK_DEFAULT ':' S ';'
          | /* epsylon */
                 { $$.c = ""; }
          ;
