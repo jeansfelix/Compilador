@@ -125,7 +125,7 @@ GLOBAL_VAR : VAR_ARRAY ';' GLOBAL_VAR
 
 FUNCOES : TIPO NOME_FUNC '(' ARGUMENTOS ')' BLOCO FUNCOES
                     { $$.c = $1.t.nome + " " + $2.v + $3.v + $4.c + $5.v + 
-                          "\n{\n" + gerarDeclaracaoVariaveisLocais($2.v) + $6.c + "}\n\n" + $7.c; }
+                          "\n{\n" + gerarDeclaracaoVariaveisLocais($2.v) + "\n" + $6.c + "}\n\n" + $7.c; }
          | /* epsylon */
                     { $$.c = ""; }
          ;
@@ -167,9 +167,9 @@ BLOCO_CASE : S ';'
 	       ;
 
 S : VAR ';' S 
-        { $$.c = $1.c + "\n" + $3.c; }
+        { $$.c = $1.c + $3.c; }
   | VAR_ARRAY ';' S
-        { $$.c = $1.c + "\n" + $3.c; }
+        { $$.c = $1.c + $3.c; }
   | ATR ';' S 
         { $$.c = $1.c + $3.c; }
   | COMANDO S 
@@ -183,13 +183,13 @@ S : VAR ';' S
 COMANDO : CMD_IF
             {$$ = $1;}
         | CMD_FOR
-            {$$ = $1;}
+            {$$ = $1; $$.c += "\n";}
         | CMD_WHILE
-            {$$ = $1;}
+            {$$ = $1; $$.c += "\n";}
         | CMD_DOWHILE
-            {$$ = $1;}
+            {$$ = $1; $$.c += "\n";}
         | CMD_SWITCH
-            {$$ = $1;}
+            {$$ = $1; $$.c += "\n";}
         | CMD_RETURN
             {$$ = $1;}
       	| CMD_LEITURA
