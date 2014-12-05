@@ -334,7 +334,8 @@ CHAMA_FUNC : _TK_ID '(' PARAMETROS ')'
 	          }
 	          parametros += $3.t.tamanhos.at(i);
 	          
-              $$.c = $1.v + "(" + parametros + ")"; 
+            //TODO: Criar um teste para saber quando que é colocado o ';'. Do jeito que está ele está sendo colocado aqui e na atribuição.
+              $$.c = $1.v + "(" + parametros + ");"; 
               $$.v = $1.v;
               $$.t = tipoRetorno[$1.v];
               
