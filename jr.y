@@ -45,9 +45,11 @@ struct Atributo {
 
 typedef map< string, Tipo > TS;
 typedef map< string, TS > FunctionScopes;
+typedef map< string, Tipo > Argumentos;
 
 TS tsGlobais;
 FunctionScopes fs;
+Argumentos args;
 vector<string> pilhaFimLoop;
 
 string scope = "global";
@@ -148,13 +150,15 @@ NOME_FUNC : _TK_ID
 ARGUMENTOS : TIPO _TK_ID ',' ARGUMENTOS 
                 { $$.c = $1.t.nome + " " + $2.v + $3.v + " " + $4.c; }
            | TIPO _TK_ID
-                { $$.c = $1.t.nome + " " + $2.v; }
+                { $$.c = $1.t.nome + " " + $2.v; args[$2.v] = $1.t; }
            | /* epsylon */
                 { $$.c = ""; }
            ;
 
-PARAMETROS : EXP ',' PARAMETROS
-           | EXP
+PARAMETROS : PARAMETROS ',' F
+            { $$.c = ""; $$.t.tamanhos = $1.t.tamanhos; $$.t.tamanhos.push_back($3.v); }
+           | F
+            { $$.c = ""; $$.t.tamanhos.push_back($1.v); }
            | /* epsylon */
                 { $$.c = ""; }
            ;
@@ -207,8 +211,8 @@ COMANDO : CMD_IF
       	    {$$ = $1;}
 	    | CMD_ESCRITA
 	        {$$ = $1;}
-	    | CHAMA_FUNC
-	        {$$ = $1;}
+	    | CHAMA_FUNC ';'
+	        {$$.c = $1.c+";\n";}
         ;
 
 CMD_RETURN : _TK_RETURN F ';'
@@ -305,6 +309,7 @@ TIPO : _TK_INT      { $$ = $1; }
      ;
      
 CHAMA_FUNC : _TK_ID '(' PARAMETROS ')'
+          { $$.c = "    " + $1.v + "(" + $3.v + ")"; }
 	       ;     
 	       
 ATR : _TK_ID '=' EXP
