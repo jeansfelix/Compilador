@@ -283,9 +283,9 @@ ARRAY : ARRAY '[' _C_INT ']'
              { $$.c = ""; $$.t.tamanhos.push_back($2.v); }
       ;
       
-INDICE : INDICE ',' _C_INT
+INDICE : INDICE ',' F
              { $$.c = ""; $$.t.tamanhos = $1.t.tamanhos; $$.t.tamanhos.push_back($3.v); }
-       | _C_INT
+       | F
              { $$.c = ""; $$.t.tamanhos.push_back($1.v); }
        ;
 
