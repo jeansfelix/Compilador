@@ -17,10 +17,12 @@ const int MAX_STRING = 256;
 
 struct Tipo {
   string nome;
+  int tamanho;
   
   Tipo() {}
-  Tipo( string nome ) {
+  Tipo( string nome, int tamanho = 0 ) {
     this->nome = nome;
+    this->tamanho = tamanho;
   }
 };
 
@@ -79,7 +81,9 @@ void gerarCodigoFor( Atributo* SS, const string fim_for,const Atributo& inicial,
 
 void gerarCodigoSwitch();//TODO
 
-void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3);
+void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo operador, Atributo atr2);
+void gerarCodAux_Int_String(string *atr1Value, string *atr2Value, string *cod_aux, string *cod_free, Tipo atr1_t, Tipo atr2_t);
+
 void gerarCodigo_EXP_UNARIA(Atributo *atr, Atributo atr1 , Atributo atr2);
 
 
@@ -263,7 +267,7 @@ CASE : _TK_CASE  _TK_ID    ':' BLOCO_CASE
      ;
 
 VAR_ARRAY : TIPO '[' ']' _TK_ID ARRAY
-                 { gerarDeclaracaoVariavel( &$$, $1, $2 ); }
+                 {  }
           ;
 
 ARRAY : '[' _C_INT ']' ARRAY
@@ -327,6 +331,7 @@ EXP : EXP '+' EXP
     | _TK_ID '[' INDICE ']'
             { $$.v = gerarTemp($1.t); $$.c = $1.v + $2.v + $3.v + $4.v + "\n"; }
     | F
+        {$$ = $1;}
     ;
     
 INDICE : EXP ',' INDICE
@@ -526,16 +531,13 @@ void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, Atributo S3){
     }
 }
 
-void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3){
-    atr->t = tipoResultado( atr1.t, atr2.v, atr3.t );
+void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo operador, Atributo atr2){
+    atr->t = tipoResultado( atr1.t, operador.v, atr2.t );
     
     if (atr->t.nome == "string") 
     {
         string atr1Value;
-        string atr3Value;
-        
-        string temp_atr1;
-        string temp_atr3;
+        string atr2Value;
         
         string cod_aux;
         
@@ -543,45 +545,20 @@ void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3
          * e adicionar este cod_free ao fim dessa geração.
          */
         string cod_free;
-     
-        if (atr1.t.nome == "string" && atr3.t.nome == "string") 
-        {
-            atr1Value = atr1.v;
-            atr3Value = atr3.v;
-        }
-        else if ( atr1.t.nome == "string" && atr3.t.nome == "int" ) 
-        {
-            atr1Value = atr1.v;
-            
-            temp_atr3 = gerarTemp(Tipo("string"));
-            
-            cod_aux = "    sprintf(" + temp_atr3 + ",\"%d\", " + atr3.v + ");\n";
-
-            atr3Value = temp_atr3;
-            
-            cod_free = "    free(" + temp_atr3 + ");\n";
-        }
-        else if ( atr1.t.nome == "int" && atr3.t.nome == "string" ) 
-        {
-            atr3Value = atr3.v;
-            
-            temp_atr1 = gerarTemp(Tipo("string"));
-            
-            cod_aux = "    sprintf(" + temp_atr1 + ",\"%d\", " + atr1.v + ");\n";
-
-            atr1Value = temp_atr1;
-            
-            cod_free = "    free(" + temp_atr1 + ");\n";
-        }
+       
+        atr1Value = atr1.v;
+        atr2Value = atr2.v;
         
+        gerarCodAux_Int_String(&atr2Value, &atr1Value, &cod_aux, &cod_free, atr2.t, atr1.t);
+        gerarCodAux_Int_String(&atr1Value, &atr2Value, &cod_aux, &cod_free, atr1.t, atr2.t);
         
         string temp = gerarTemp(atr->t);
         atr->v = gerarTemp(atr->t);      
         
-        atr->c = atr1.c + atr3.c + cod_aux
+        atr->c = atr1.c + atr2.c + cod_aux
                                  + "    strncpy(" + temp + ", " + atr1Value + ", " + toStr(MAX_STRING - 1) + ");\n"
                                  + "    " + temp + "[" + toStr(MAX_STRING - 1) + "] = 0;\n"
-                                 + "    strncat( " + temp + ", " + atr3Value + ", " + toStr(MAX_STRING - 1)
+                                 + "    strncat( " + temp + ", " + atr2Value + ", " + toStr(MAX_STRING - 1)
                                  + " - " + "strlen(" + atr1Value + ")" + " );\n"
                                  + "    strncpy(" + atr->v + ", " + temp + ", " + toStr(MAX_STRING - 1) + ");\n" 
                                  + "    " + atr->v + "[" + toStr(MAX_STRING - 1) + "] = 0;\n"
@@ -590,7 +567,7 @@ void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo atr2, Atributo atr3
     }
     
     atr->v = gerarTemp(atr->t);
-    atr->c = atr1.c + atr3.c + "    " + atr->v + " = " + atr1.v + " " + atr2.v + " " + atr3.v + ";\n";
+    atr->c = atr1.c + atr2.c + "    " + atr->v + " = " + atr1.v + " " + operador.v + " " + atr2.v + ";\n";
 }
 
 
@@ -599,6 +576,20 @@ void gerarCodigo_EXP_UNARIA(Atributo *atr, Atributo atr1 , Atributo atr2){
     atr->t = tipoResultado( Tipo(""), atr1.v, atr2.t );
     atr->v = gerarTemp(atr->t); 
     atr->c = atr2.c + "    " + atr->v + " = " + atr1.v + atr2.v + ";\n";
+}
+
+void gerarCodAux_Int_String(string *atr1Value, string *atr2Value, string *cod_aux, string *cod_free, Tipo atr1_t, Tipo atr2_t)
+{  
+    if ( atr1_t.nome == "int" && atr2_t.nome == "string" )
+    {
+        string temp_atr1;
+        string temp_atr2;
+        
+        temp_atr1 = gerarTemp(Tipo("string"));
+        *cod_aux = "    sprintf(" + temp_atr1 + ",\"%d\", " + *atr1Value + ");\n";
+        *atr1Value = temp_atr1;
+        *cod_free = "    free(" + temp_atr1 + ");\n";
+    }
 }
 
 bool buscarVariavelTS( TS& ts, string nomeVar, Tipo* tipo ){
