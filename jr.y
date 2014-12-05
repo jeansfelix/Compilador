@@ -139,6 +139,8 @@ GLOBAL_VAR : VAR_ARRAY ';' GLOBAL_VAR
                     {$$.c = $1.c;}
            ;
 
+
+
 FUNCOES : TIPO_NOME_FUNC '(' ARGUMENTOS ')' BLOCO FUNCOES
                     {
                         $$.c = $1.t.nome + " " + $1.v + "(" + $3.c + ")" 
@@ -225,7 +227,7 @@ COMANDO : CMD_IF
 	    | CMD_ESCRITA
 	        {$$ = $1;}
 	    | CHAMA_FUNC ';'
-	        {$$.c = "    " + $1.c + ";\n";}
+	        {$$.c = "    " + $1.v + ";\n";}
         ;
 
 CMD_RETURN : _TK_RETURN EXP ';'
@@ -334,8 +336,7 @@ CHAMA_FUNC : _TK_ID '(' PARAMETROS ')'
 	          }
 	          parametros += $3.t.tamanhos.at(i);
 	          
-              $$.c = $1.v + "(" + parametros + ")"; 
-              $$.v = $1.v;
+              $$.v = $1.v + "(" + parametros + ")";
               $$.t = tipoRetorno[$1.v];
               
           }
@@ -568,15 +569,6 @@ void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, Atributo S3)
     if (S1->t.nome == S3.t.nome )
     {
         string max = toStr(MAX_STRING - 1);
-    
-        bool ehFunc = buscarVariavelTS(tipoRetorno, S3.v);
-    
-        if (ehFunc) 
-        {
-            SS->c = "    " + S1->v + " = " + S3.c + ";\n";
-            SS->t = S1->t;
-            return;
-        }
     
         if (S1->t.nome == "string")
         {
