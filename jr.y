@@ -44,12 +44,15 @@ struct Atributo {
 };
 
 typedef map< string, Tipo > TS;
+typedef map< string, Tipo > TipoRetorno;
 typedef map< string, TS > FunctionScopes;
 typedef map< string, Tipo > Argumentos;
 
 TS tsGlobais;
 FunctionScopes fs;
 Argumentos args;
+TipoRetorno tipoRetorno;
+
 vector<string> pilhaFimLoop;
 
 string scope = "global";
@@ -136,19 +139,29 @@ GLOBAL_VAR : VAR_ARRAY ';' GLOBAL_VAR
                     {$$.c = $1.c;}
            ;
 
-FUNCOES : TIPO NOME_FUNC '(' ARGUMENTOS ')' BLOCO FUNCOES
-                    { $$.c = $1.t.nome + " " + $2.v + $3.v + $4.c + $5.v + 
-                          "\n{\n" + gerarDeclaracaoVariaveisLocais($2.v) + "\n" + $6.c + "}\n\n" + $7.c; }
+FUNCOES : TIPO_NOME_FUNC '(' ARGUMENTOS ')' BLOCO FUNCOES
+                    {
+                        $$.c = $1.t.nome + " " + $1.v + "(" + $3.c + ")" 
+                        + "\n{\n" + gerarDeclaracaoVariaveisLocais($1.v) + "\n" + $5.c + "}\n\n" + $6.c; 
+                        
+                    }
          | /* epsylon */
                     { $$.c = ""; }
          ;
          
-NOME_FUNC : _TK_ID
-              {scope = $1.v; $$ = $1;}
+         
+TIPO_NOME_FUNC : TIPO _TK_ID
+              {
+                  $$.c = "";
+                  scope = $2.v; 
+                  $$.t = $1.t;
+                  $$.v = $2.v;
+                  tipoRetorno[$2.v] = $1.t;
+              }
           ;
 
 ARGUMENTOS : TIPO _TK_ID ',' ARGUMENTOS 
-                { $$.c = $1.t.nome + " " + $2.v + $3.v + " " + $4.c; }
+                { $$.c = $1.t.nome + " " + $2.v + $3.v + " " + $4.c; args[$2.v] = $1.t; }
            | TIPO _TK_ID
                 { $$.c = $1.t.nome + " " + $2.v; args[$2.v] = $1.t; }
            | /* epsylon */
@@ -212,11 +225,11 @@ COMANDO : CMD_IF
 	    | CMD_ESCRITA
 	        {$$ = $1;}
 	    | CHAMA_FUNC ';'
-	        {$$.c = $1.c+";\n";}
+	        {$$.c = "    " + $1.c + ";\n";}
         ;
 
-CMD_RETURN : _TK_RETURN F ';'
-                {$$.c = "    " + $1.v + " " + $2.v + ";\n";}
+CMD_RETURN : _TK_RETURN EXP ';'
+                {$$.c = $2.c + "    " + $1.v + " " + $2.v + ";\n";}
            | _TK_RETURN ';'
                 {$$.c = "    " + $1.v + ";\n";}
            ;
@@ -309,9 +322,25 @@ TIPO : _TK_INT      { $$ = $1; }
      ;
      
 CHAMA_FUNC : _TK_ID '(' PARAMETROS ')'
-          { $$.c = "    " + $1.v + "(" + $3.v + ")"; }
-	       ;     
-	       
+          {
+              $$.c = "";
+
+              string parametros;
+              int i;
+              
+              for (i = 0; i < $3.t.tamanhos.size() - 1; i++) 
+	          {
+	              parametros += $3.t.tamanhos.at(i) + ", ";
+	          }
+	          parametros += $3.t.tamanhos.at(i);
+	          
+              $$.c = $1.v + "(" + parametros + ")"; 
+              $$.v = $1.v;
+              $$.t = tipoRetorno[$1.v];
+              
+          }
+	       ;   
+ 	       
 ATR : _TK_ID '=' EXP
             { gerarCodigo_Atribuicao(&$$, &$1, $3); }
     | _TK_ID '[' INDICE ']' '=' EXP 
@@ -514,10 +543,11 @@ void gerarCodigoSwitch(Atributo* SS, const Atributo& comparacao, const Atributo&
 }
 
 void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, Atributo S3)
-{
+{  
     bool varEhGlobal = buscarVariavelTS( tsGlobais, S1->v);
+    bool varEhArgs = buscarVariavelTS(args, S1->v);
 
-    if (!varEhGlobal && !buscarVariavelTS(fs[scope], S1->v))
+    if (!varEhGlobal && !buscarVariavelTS(fs[scope], S1->v) && !varEhArgs)
     {
          erro( "Variavel nao declarada: " + S1->v );
     }
@@ -525,6 +555,10 @@ void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, Atributo S3)
     if (varEhGlobal)
     {
         S1->t = tsGlobais[S1->v];
+    }
+    else if (varEhArgs) 
+    {
+        S1->t = args[S1->v];
     }
     else
     {
@@ -534,6 +568,15 @@ void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, Atributo S3)
     if (S1->t.nome == S3.t.nome )
     {
         string max = toStr(MAX_STRING - 1);
+    
+        bool ehFunc = buscarVariavelTS(tipoRetorno, S3.v);
+    
+        if (ehFunc) 
+        {
+            SS->c = "    " + S1->v + " = " + S3.c + ";\n";
+            SS->t = S1->t;
+            return;
+        }
     
         if (S1->t.nome == "string")
         {
@@ -700,6 +743,13 @@ bool verificarSeVariavelFoiDeclarada(string nomeVar)
 
 void gerarCodigo_F_para_TK_ID(Atributo *atr, const Atributo& id)
 {
+    if (buscarVariavelTS(args, id.v))
+    {
+        atr->v = id.v;
+        atr->t = args[atr->v];
+        return;
+    }
+
     if (buscarVariavelTS(tsGlobais, id.v))
     {
         atr->v = id.v;
