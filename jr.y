@@ -1,6 +1,6 @@
 /**
-Nome: Renan Hozumi Barbieri; DRE: 111201610
-Nome: Jean Da Silva Felix; DRE: 111318920
+Nome: Renan Hozumi Barbieri;  DRE: 111201610
+Nome: Jean Da Silva Felix;    DRE: 111318920
 **/
 
 %{
