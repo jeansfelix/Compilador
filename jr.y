@@ -14,15 +14,17 @@ Nome: Jean Da Silva Felix; DRE: 111318920
 using namespace std;
 
 const int MAX_STRING = 256;
-
+/*
+*   Utilizo tamanhos tanto para guardar os valores do indice de uma matriz
+*   como para guardar os valores do tamanho de linha e coluna de uma matriz.
+*/
 struct Tipo {
   string nome;
-  int tamanho;
+  vector<string> tamanhos;
   
   Tipo() {}
-  Tipo( string nome, int tamanho = 0 ) {
+  Tipo(string nome) {
     this->nome = nome;
-    this->tamanho = tamanho;
   }
 };
 
@@ -66,10 +68,15 @@ bool buscarVariavelTS( TS& ts, string nomeVar, Tipo* tipo );
 bool buscarVariavelTS( TS& ts, string nomeVar );
 bool verificarSeVariavelFoiDeclarada(string nomeVar);
 
-void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, const Atributo S3);
 void gerarDeclaracaoVariavel(Atributo* SS, const Atributo& tipo, const Atributo& id );
+void gerarDeclaracaoVariavelArray(Atributo* SS, const Atributo& tipo, const Atributo& id, const Atributo& array );
+
+void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, const Atributo S3);
 void inserirVariavelTS( string nomeVar, Tipo tipo );
-void gerarCodigo_F_para_TK_ID(Atributo *atr, Atributo atr1);
+
+void gerarCodigo_F_para_TK_ID(Atributo *atr, const Atributo& id);
+void gerarCodigo_F_para_TK_ID_ARRAY(Atributo *atr, const Atributo& id, const Atributo& index);
+int calcularIndice(vector<string> valorDimensoes, vector<string> dimensoes);
 
 void gerarCodigoIf(Atributo *SS, Atributo exp_if, Atributo bloco_if);
 void gerarCodigoIfElse(Atributo *SS, Atributo exp_if, Atributo bloco_if, Atributo bloco_else);
@@ -266,15 +273,21 @@ CASE : _TK_CASE  _TK_ID    ':' BLOCO_CASE
         { $$.c = $2.c + $3.v + $4.c; }
      ;
 
-VAR_ARRAY : TIPO '[' ']' _TK_ID ARRAY
-                 {  }
+VAR_ARRAY : TIPO _TK_ID ARRAY
+                 { gerarDeclaracaoVariavelArray(&$$, $1, $2, $3); }
           ;
 
-ARRAY : '[' _C_INT ']' ARRAY
-             { $$.c = $2.v ;}
-      | /* epsylon */
-             { $$.c = ""; }
+ARRAY : ARRAY '[' _C_INT ']'
+             { $$.c = ""; $$.t.tamanhos = $1.t.tamanhos; $$.t.tamanhos.push_back($3.v); }
+      | '[' _C_INT ']'
+             { $$.c = ""; $$.t.tamanhos.push_back($2.v); }
       ;
+      
+INDICE : INDICE ',' _C_INT
+             { $$.c = ""; $$.t.tamanhos = $1.t.tamanhos; $$.t.tamanhos.push_back($3.v); }
+       | _C_INT
+             { $$.c = ""; $$.t.tamanhos.push_back($1.v); }
+       ;
 
 VAR : VAR ',' _TK_ID
         { gerarDeclaracaoVariavel( &$$, $1, $3 ); }
@@ -296,8 +309,8 @@ CHAMA_FUNC : _TK_ID '(' PARAMETROS ')'
 	       
 ATR : _TK_ID '=' EXP
             { gerarCodigo_Atribuicao(&$$, &$1, $3); }
-    | _TK_ID '[' EXP ']' '=' EXP 
-            { $$.c = $6.c + $3.c + "    " + $1.v + $2.v + $3.v + $4.v + $3.c + " = " + $6.v + ";\n"; }
+    | _TK_ID '[' INDICE ']' '=' EXP 
+            { $$.c = $6.c + $3.c + "    " + $1.v + "[" + $3.v + "]" + $3.c + " = " + $6.v + ";\n"; }
     ;
 
 EXP : EXP '+' EXP  
@@ -328,15 +341,9 @@ EXP : EXP '+' EXP
             { gerarCodigo_EXP(&$$, $1 , $2, $3); }
     | EXP_UNARIA
             { $$.c = $1.c; }
-    | _TK_ID '[' INDICE ']'
-            { $$.v = gerarTemp($1.t); $$.c = $1.v + $2.v + $3.v + $4.v + "\n"; }
     | F
         {$$ = $1;}
     ;
-    
-INDICE : EXP ',' INDICE
-       | EXP
-       ;
            
 EXP_UNARIA : _OP_INC EXP
                 { gerarCodigo_EXP_UNARIA(&$$, $1, $2); }
@@ -354,6 +361,8 @@ F : _TK_ID       { gerarCodigo_F_para_TK_ID(&$$, $1); }
   | _C_FLOAT     { $$ = $1; }
   | '(' EXP ')'  { $$ = $2; }
   | CHAMA_FUNC   { $$ = $1; }
+  | _TK_ID '[' INDICE ']'
+                 { gerarCodigo_F_para_TK_ID_ARRAY(&$$, $1, $3); }
   ;
 
 %%
@@ -581,8 +590,6 @@ void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo operador, Atributo 
     atr->c = atr1.c + atr2.c + "    " + atr->v + " = " + atr1.v + " " + operador.v + " " + atr2.v + ";\n";
 }
 
-
-
 void gerarCodigo_EXP_UNARIA(Atributo *atr, Atributo atr1 , Atributo atr2)
 {
     atr->t = tipoResultado( Tipo(""), atr1.v, atr2.t );
@@ -626,7 +633,7 @@ bool buscarVariavelTS( TS& ts, string nomeVar )
 
 void gerarDeclaracaoVariavel(Atributo* SS, const Atributo& tipo, const Atributo& id )
 {
-    SS->v = "";
+    SS->c = "";
 
     if (verificarSeVariavelFoiDeclarada(id.v))
     {
@@ -634,6 +641,22 @@ void gerarDeclaracaoVariavel(Atributo* SS, const Atributo& tipo, const Atributo&
     }
 
     inserirVariavelTS(id.v, tipo.t );
+}
+
+void gerarDeclaracaoVariavelArray(Atributo* SS, const Atributo& tipo, const Atributo& id, const Atributo& array)
+{
+    SS->c = "";
+    Tipo tipoArray;
+    
+    if (verificarSeVariavelFoiDeclarada(id.v))
+    {
+        erro( "Redeclaração da variavel do tipo array: " + id.v );
+    }
+    
+    tipoArray.nome = tipo.t.nome;
+    tipoArray.tamanhos = array.t.tamanhos;
+    
+    inserirVariavelTS(id.v, tipoArray);
 }
 
 void inserirVariavelTS(string nomeVar, Tipo tipo )
@@ -670,22 +693,71 @@ bool verificarSeVariavelFoiDeclarada(string nomeVar)
     return false;
 }
 
-void gerarCodigo_F_para_TK_ID(Atributo *atr, Atributo atr1)
+void gerarCodigo_F_para_TK_ID(Atributo *atr, const Atributo& id)
 {
-    if (buscarVariavelTS(tsGlobais, atr1.v))
+    if (buscarVariavelTS(tsGlobais, id.v))
     {
-        atr->v = atr1.v;
+        atr->v = id.v;
         atr->t = tsGlobais[atr->v];
         return;
     }
 
-    if( buscarVariavelTS(fs[scope], atr1.v) )
+    if( buscarVariavelTS(fs[scope], id.v) )
     {
-        atr->v = atr1.v;
+        atr->v = id.v;
         atr->t = fs[scope][atr->v];
         return;
     }
-    erro( "Variavel nao declarada: " + atr1.v );
+    erro( "Variavel nao declarada: " + id.v );
+}
+
+void gerarCodigo_F_para_TK_ID_ARRAY(Atributo *atr, const Atributo& id, const Atributo& index)
+{
+    atr->c = index.c;
+    
+    if (index.t.nome != "int") 
+    {
+        erro("Passando índice não inteiro: " + index.v);
+    }
+
+    if (buscarVariavelTS(tsGlobais, id.v))
+    {
+        atr->t = tsGlobais[atr->v];
+        
+        int aux = calcularIndice(index.t.tamanhos, atr->t.tamanhos);
+        
+        atr->v = " " + id.v + "[" + toStr(aux) + "]";
+        return;
+    }
+
+    if(buscarVariavelTS(fs[scope], id.v))
+    {
+        atr->t = fs[scope][atr->v];
+        
+        int aux = calcularIndice(index.t.tamanhos, atr->t.tamanhos);
+        
+        atr->v = " " + id.v + "[" + toStr(aux) + "]";
+        return;
+    }
+    erro( "Variavel nao declarada: " + id.v );
+}
+
+int calcularIndice(vector<string> valorDimensoes, vector<string> dimensoes)
+{
+    int valorFinal = 0;
+    const int numeroDimensao = valorDimensoes.size();
+
+    if (numeroDimensao == 2)
+    {
+        const char *aux1 = (dimensoes.at(0)).c_str();
+        const char *aux2 = (valorDimensoes.at(0)).c_str();
+        const char *aux3 = (valorDimensoes.at(1)).c_str();
+        
+        return atoi(aux1) * atoi(aux2) + atoi(aux3);
+    }
+    
+    const char *aux = (valorDimensoes.at(0)).c_str();
+    return atoi(aux);
 }
 
 string gerarDeclaracaoVariaveisGlobais()
@@ -715,14 +787,28 @@ string gerarDeclaracaoVariaveisLocais(string escopoFuncao)
     
     for (std::map<string, Tipo>::iterator it=ts.begin(); it!=ts.end(); ++it)
     {
-        if (it->second.nome != "string")
+        if (!it->second.tamanhos.empty())
         {
-            c = c + "    " + it->second.nome + " " + it->first + ";\n";
+            int contadorDimensao = 1;
+            const int numeroDimensao = it->second.tamanhos.size();
+        
+            for (int i=0; i < numeroDimensao ; i++)
+            {
+                const char *aux = (it->second.tamanhos.at(i)).c_str();
+                contadorDimensao *= atoi(aux);
+            }
+        
+            c = c + "    " + it->second.nome + " " + it->first + "[" + toStr(contadorDimensao) + "]" + ";\n";
+            continue;
         }
-        else
+        
+        if (it->second.nome == "string")
         {
             c = c + "    char " + it->first + "["+ toStr( MAX_STRING ) +"];\n"; ;
+            continue;        
         }
+        
+        c = c + "    " + it->second.nome + " " + it->first + ";\n";
     }
     
     return c;
