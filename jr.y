@@ -98,6 +98,8 @@ void gerarCodAux_Int_String(string *atr1Value, string *atr2Value, string *cod_au
 
 void gerarCodigo_EXP_UNARIA(Atributo *atr, Atributo atr1 , Atributo atr2);
 
+string gerarCodigoCMD_LEITURA(Atributo& id);
+string gerarCodigoCMD_ESCRITA(Atributo& id);
 
 #define YYSTYPE Atributo
 
@@ -270,10 +272,11 @@ CMD_SWITCH : _TK_SWITCH '(' _TK_ID ')' '{' LST_CASE '}'
            ;
 
 CMD_ESCRITA : _IO_PRINT '(' EXP ')' ';'
-                    { $$.c = $3.c + "    printf(\"%s\"," + $3.v + ");\n"; }
+                    { $$.c = $3.c +  gerarCodigoCMD_ESCRITA($3); }
 	        ;
 			
 CMD_LEITURA : _IO_SCAN '(' _TK_ID ')' ';'
+                    { $$.c = gerarCodigoCMD_LEITURA($3); }
 	        ;
 
 LST_CASE : CASE LST_CASE
@@ -884,6 +887,40 @@ string gerarDeclaracaoVariaveisTemporarias()
         c += "char temp_string_" + toStr( i + 1 ) + "[" + toStr( MAX_STRING )+ "];\n";
 
     return c;  
+}
+
+string gerarCodigoCMD_LEITURA(Atributo& id)
+{
+    string aux = "&";    
+    Tipo tipoId;
+    
+    if (buscarVariavelTS(args, id.v))
+    {
+        tipoId = args[id.v];
+    }
+    else if (buscarVariavelTS(tsGlobais, id.v))
+    {
+        tipoId = tsGlobais[id.v];
+    }
+    else if( buscarVariavelTS(fs[scope], id.v) )
+    {
+        tipoId = fs[scope][id.v];
+    }
+    
+    if (tipoId.nome == "int") 
+    {
+        return "    scanf(\"%d\"," + aux + id.v + ");\n";
+    }
+    
+    if (tipoId.nome == "string") 
+    {
+        return "    scanf(\"%s\"," + id.v + ");\n";
+    }
+}
+
+string gerarCodigoCMD_ESCRITA(Atributo& id)
+{
+     return "    printf(\"%s\"," + id.v + ");\n";
 }
 
 string gerarTemp(Tipo tipo)
