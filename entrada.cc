@@ -1,31 +1,51 @@
-int mdc(int a, int b )
-{   
-    if( b equal 0)
+int main()
+{
+    int a[3][4];
+    int b[4][10];
+    int c[3][10];
+    int i, j, k, acumulador;
+    
+    for (i = 0; i < 3; i = i + 1) 
     {
-        return a;
+        for (j = 0; j < 4; j = j + 1) 
+        {
+            a[i,j] = 1;
+        }
     }
     
-    int temp;
-    temp = a % b;
+    for (i = 0; i < 4; i = i + 1) 
+    {
+        for (j = 0; j < 10; j = j + 1) 
+        {
+            b[i,j] = 1;
+        }
+    }
     
-    return mdc(b, temp);
-}
-
-int main()
-{   
-    int mc; 
-    int a, b;
+    acumulador = 0;
     
-    print("Calcular MDC(a,b):\n");
-    print("Digite o valor de a:\n");
-    scan(a);
+    for (i = 0; i < 3; i = i + 1) 
+    {
+        for (j = 0; j < 10; j = j + 1) 
+        {
+            for (k = 0; k < 4; k = k + 1) 
+            {
+                acumulador = acumulador + a[i,k] * b[k,j];
+            }
+            c[i,j] = acumulador;
+            acumulador = 0;
+        }
+    }
     
-    print("Digite o valor de b:\n");
-    scan(b);
+    for (j = 0; j < 10; j = j + 1) 
+    {
+        for (i = 0; i < 3; i = i + 1) 
+        {
+            print(c[i,j] + " ");
+        }
+        print("\n");
+    }
     
-    mc = mdc(30, 36);
-    
-    print("O mdc entre " + a + " e " + b + " vale: "+ mc + "\n");
     
     return 0;
 }
+

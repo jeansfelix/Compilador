@@ -56,6 +56,7 @@ TipoRetorno tipoRetorno;
 vector<string> pilhaFimLoop;
 
 string scope = "global";
+string switchAtual = "";
 
 string gerarLabel(string cmd);
 string gerarTemp(Tipo tipo);
@@ -77,11 +78,12 @@ void gerarDeclaracaoVariavel(Atributo* SS, const Atributo& tipo, const Atributo&
 void gerarDeclaracaoVariavelArray(Atributo* SS, const Atributo& tipo, const Atributo& id, const Atributo& array );
 
 void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, const Atributo S3);
+void gerarCodigo_AtribuicaoArray(Atributo *SS, Atributo *S1, Atributo S3, Atributo S6);
 void inserirVariavelTS( string nomeVar, Tipo tipo );
 
 void gerarCodigo_F_para_TK_ID(Atributo *atr, const Atributo& id);
 void gerarCodigo_F_para_TK_ID_ARRAY(Atributo *atr, const Atributo& id, const Atributo& index);
-int calcularIndice(vector<string> valorDimensoes, vector<string> dimensoes);
+string calcularIndice(vector<string> valorDimensoes, vector<string> dimensoes);
 
 void gerarCodigoIf(Atributo *SS, Atributo exp_if, Atributo bloco_if);
 void gerarCodigoIfElse(Atributo *SS, Atributo exp_if, Atributo bloco_if, Atributo bloco_else);
@@ -91,7 +93,8 @@ void gerarCodigoWhile(Atributo *SS, const string fim_while, const Atributo& cond
 void gerarCodigoDoWhile(Atributo *SS, const string fim_dowhile, const Atributo& condicao, const Atributo& bloco_while);
 void gerarCodigoFor( Atributo* SS, const string fim_for,const Atributo& inicial, const Atributo& condicao, const Atributo& passo, const Atributo& cmds);
 
-void gerarCodigoSwitch();//TODO
+void gerarCodigoSwitch(Atributo *SS, string fimLoop, Atributo& cases);
+void gerarCodigoCase(Atributo *SS, Atributo& teste, Atributo& bloco);
 
 void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo operador, Atributo atr2);
 void gerarCodAux_Int_String(string *atr1Value, string *atr2Value, string *cod_aux, string *cod_free, Tipo atr1_t, Tipo atr2_t);
@@ -193,11 +196,6 @@ BLOCO_OPCIONAL : BLOCO
                     { $$.c = gerarCodigoBreak(); }
                ;
 
-BLOCO_CASE : S ';'
-               { $$.c = $1.c + gerarCodigoBreak(); }
-	       | CASE
-	       ;
-
 S : VAR ';' S 
         { $$.c = $1.c + $3.c; }
   | VAR_ARRAY ';' S
@@ -233,7 +231,10 @@ COMANDO : CMD_IF
         ;
 
 CMD_RETURN : _TK_RETURN EXP ';'
-                {$$.c = $2.c + "    " + $1.v + " " + $2.v + ";\n";}
+                {
+                    string temp = gerarTemp($2.t);
+                    $$.c = $2.c + "    " + temp + " = " + $2.v + ";\n    return " + temp + ";\n";
+                }
            | _TK_RETURN ';'
                 {$$.c = "    " + $1.v + ";\n";}
            ;
@@ -254,6 +255,10 @@ LOOP_DOWHILE : _TK_DO
 LOOP_FOR : _TK_FOR
              {pilhaFimLoop.push_back($1.fimLoop);}
          ;
+         
+SWITCH : _TK_SWITCH
+            {pilhaFimLoop.push_back($1.fimLoop);}
+       ;
 
 CMD_FOR : LOOP_FOR '(' ATR ';' EXP ';' ATR ')' BLOCO_OPCIONAL
         { gerarCodigoFor(&$$, $1.fimLoop, $3, $5, $7, $9); }
@@ -267,8 +272,12 @@ CMD_DOWHILE : LOOP_DOWHILE BLOCO _TK_WHILE '(' EXP ')' ';'
             { gerarCodigoDoWhile(&$$, $1.fimLoop, $5, $2); }
             ;
 
-CMD_SWITCH : _TK_SWITCH '(' _TK_ID ')' '{' LST_CASE '}'
+CMD_SWITCH : SWITCH '(' VAR_SWITCH ')' '{' LST_CASE '}'
+            { gerarCodigoSwitch(&$$, $1.fimLoop, $6); }
+           ;
 
+VAR_SWITCH : _TK_ID
+                {switchAtual = $1.v; $$.v = $1.v;}
            ;
 
 CMD_ESCRITA : _IO_PRINT '(' EXP ')' ';'
@@ -280,20 +289,28 @@ CMD_LEITURA : _IO_SCAN '(' _TK_ID ')' ';'
 	        ;
 
 LST_CASE : CASE LST_CASE
-         | _TK_DEFAULT ':' S ';'
+                { $$.c = $1.c + $2.c; }
+         | _TK_DEFAULT ':' S
+                { $$.c = $3.c; }
          | /* epsylon */
                 { $$.c = ""; }
          ;
          
 CASE : _TK_CASE  _TK_ID    ':' BLOCO_CASE
-        { $$.c = $2.c + $3.v + $4.c; }
+            { gerarCodigoCase(&$$, $2, $4); }
      | _TK_CASE  _C_INT    ':' BLOCO_CASE
-        { $$.c = $2.c + $3.v + $4.c; }
+            { gerarCodigoCase(&$$, $2, $4); }
      | _TK_CASE  _C_CHAR   ':' BLOCO_CASE
-        { $$.c = $2.c + $3.v + $4.c; }
+            { gerarCodigoCase(&$$, $2, $4); }
      | _TK_CASE  _C_STRING ':' BLOCO_CASE
-        { $$.c = $2.c + $3.v + $4.c; }
+            { gerarCodigoCase(&$$, $2, $4); }
      ;
+
+BLOCO_CASE : BLOCO_OPCIONAL
+                {$$.c = $1.c;}
+           | CASE
+                {$$.c = $1.c;}
+	       ;
 
 VAR_ARRAY : TIPO _TK_ID ARRAY
                  { gerarDeclaracaoVariavelArray(&$$, $1, $2, $3); }
@@ -348,7 +365,7 @@ CHAMA_FUNC : _TK_ID '(' PARAMETROS ')'
 ATR : _TK_ID '=' EXP
             { gerarCodigo_Atribuicao(&$$, &$1, $3); }
     | _TK_ID '[' INDICE ']' '=' EXP 
-            { $$.c = $6.c + $3.c + "    " + $1.v + "[" + $3.v + "]" + $3.c + " = " + $6.v + ";\n"; }
+            { gerarCodigo_AtribuicaoArray(&$$, &$1, $3, $6); }
     ;
 
 EXP : EXP '+' EXP  
@@ -462,10 +479,39 @@ void gerarCodigoIfElse(Atributo *SS, Atributo exp_if, Atributo bloco_if, Atribut
 string gerarCodigoBreak() 
 {
     string codigoBreak;
+    string fimLoop = pilhaFimLoop.back();
+    
+    codigoBreak = "    goto " + fimLoop + ";\n";
+    
+    
+    if (! (fimLoop.find("switch") != string::npos)) 
+    {        
+        pilhaFimLoop.pop_back();
+    }
+    
+    
+    return codigoBreak;
+}
+
+string gerarCodigoBreakSwith() 
+{
+    string codigoBreak;
     codigoBreak = "    goto " + pilhaFimLoop.back() + ";\n";
     pilhaFimLoop.pop_back();
     
     return codigoBreak;
+}
+
+void gerarCodigoCase(Atributo *SS, Atributo& teste, Atributo& bloco)
+{
+    string label = gerarLabel("fim_case");
+    string tempIgual = gerarTemp( Tipo("boolean") );
+    string tempNotIgual = gerarTemp( Tipo("boolean") );
+    
+    SS->c = tempIgual + " = " + switchAtual + "==" + teste.v + ";\n"
+           + tempNotIgual + " = !" + tempIgual + ";\n"
+           + "    if(" + tempNotIgual + ") goto " +  label + ";\n"
+           +  bloco.c + label + ":\n";
 }
 
 /**
@@ -531,19 +577,9 @@ void gerarCodigoFor( Atributo* SS, const string fim_for, const Atributo& inicial
 /**
     Construção do código do switch
 **/
-void gerarCodigoSwitch(Atributo* SS, const Atributo& comparacao, const Atributo& bloco_switch)
+void gerarCodigoSwitch(Atributo *SS, string fimLoop, Atributo& cases)
 {
-    // CMD_SWITCH : _TK_SWITCH '(' _TK_ID ')' '{' LST_CASE '}'
-    //        ;
-
-    // LST_CASE : CASE LST_CASE
-    //          | _TK_DEFAULT ':' S _TK_BREAK ';'
-    //          | /* epsylon */
-    //                 { $$.c = ""; }
-    //          ;
-    *SS = Atributo();
-    SS->c = "";
-
+    SS->c = cases.c + fimLoop + ":\n";
 }
 
 void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, Atributo S3)
@@ -593,6 +629,43 @@ void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, Atributo S3)
     }
 }
 
+void gerarCodigo_AtribuicaoArray(Atributo *SS, Atributo *S1, Atributo S3, Atributo S6)
+{
+    bool varEhGlobal = buscarVariavelTS( tsGlobais, S1->v);
+    bool varEhArgs = buscarVariavelTS(args, S1->v);
+
+    if (!varEhGlobal && !buscarVariavelTS(fs[scope], S1->v) && !varEhArgs)
+    {
+         erro( "Variavel nao declarada: " + S1->v );
+    }
+       
+    if (varEhGlobal)
+    {
+        S1->t = tsGlobais[S1->v];
+    }
+    else if (varEhArgs) 
+    {
+        S1->t = args[S1->v];
+    }
+    else
+    {
+        S1->t = fs[scope][S1->v];
+    }
+
+    if (S1->t.nome == S6.t.nome )
+    {
+        string temp = gerarTemp(Tipo("int"));
+
+        SS->c = S6.c + S3.c + "    " + temp + " = " + calcularIndice(S3.t.tamanhos, S3.t.tamanhos) 
+               + ";\n    " + S1->v + "[" + temp + "]" 
+               + " = " + S6.v + ";\n";
+    }
+    else
+    {
+        erro("Tipo " +  S3.t.nome + " não pode ser atribuído a " + S1->t.nome + " \n");
+    }
+}
+
 void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo operador, Atributo atr2)
 {
     atr->t = tipoResultado( atr1.t, operador.v, atr2.t );
@@ -618,11 +691,15 @@ void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo operador, Atributo 
         string temp = gerarTemp(atr->t);
         atr->v = gerarTemp(atr->t);      
         
+        string temTamCopia = gerarTemp(Tipo("int"));
+        string tamCopia = gerarTemp(Tipo("int"));
+        
         atr->c = atr1.c + atr2.c + cod_aux
                                  + "    strncpy(" + temp + ", " + atr1Value + ", " + toStr(MAX_STRING - 1) + ");\n"
                                  + "    " + temp + "[" + toStr(MAX_STRING - 1) + "] = 0;\n"
-                                 + "    strncat( " + temp + ", " + atr2Value + ", " + toStr(MAX_STRING - 1)
-                                 + " - " + "strlen(" + atr1Value + ")" + " );\n"
+                                 + "    " + tamCopia + " = " + "strlen(" + atr1Value + ");\n"
+                                 + "    " + temTamCopia + " = " + toStr(MAX_STRING - 1) + " - " + tamCopia + ";\n"
+                                 + "    strncat( " + temp + ", " + atr2Value + ", " + temTamCopia + ");\n"
                                  + "    strncpy(" + atr->v + ", " + temp + ", " + toStr(MAX_STRING - 1) + ");\n" 
                                  + "    " + atr->v + "[" + toStr(MAX_STRING - 1) + "] = 0;\n"
                                  ;
@@ -770,13 +847,23 @@ void gerarCodigo_F_para_TK_ID_ARRAY(Atributo *atr, const Atributo& id, const Atr
         erro("Passando índice não inteiro: " + index.v);
     }
 
+    if (buscarVariavelTS(args, id.v))
+    {
+        atr->t = args[atr->v];
+        
+        string aux = calcularIndice(index.t.tamanhos, atr->t.tamanhos);
+        
+        atr->v = " " + id.v + "[" + aux + "]";
+        return;
+    }
+
     if (buscarVariavelTS(tsGlobais, id.v))
     {
         atr->t = tsGlobais[atr->v];
         
-        int aux = calcularIndice(index.t.tamanhos, atr->t.tamanhos);
+        string aux = calcularIndice(index.t.tamanhos, atr->t.tamanhos);
         
-        atr->v = " " + id.v + "[" + toStr(aux) + "]";
+        atr->v = " " + id.v + "[" + aux + "]";
         return;
     }
 
@@ -784,30 +871,25 @@ void gerarCodigo_F_para_TK_ID_ARRAY(Atributo *atr, const Atributo& id, const Atr
     {
         atr->t = fs[scope][atr->v];
         
-        int aux = calcularIndice(index.t.tamanhos, atr->t.tamanhos);
+        string aux = calcularIndice(index.t.tamanhos, atr->t.tamanhos);
         
-        atr->v = " " + id.v + "[" + toStr(aux) + "]";
+        atr->v = " " + id.v + "[" + aux + "]";
         return;
     }
     erro( "Variavel nao declarada: " + id.v );
 }
 
-int calcularIndice(vector<string> valorDimensoes, vector<string> dimensoes)
+string calcularIndice(vector<string> valorDimensoes, vector<string> dimensoes)
 {
-    int valorFinal = 0;
+    string valorFinal = "";
     const int numeroDimensao = valorDimensoes.size();
 
     if (numeroDimensao == 2)
-    {
-        const char *aux1 = (dimensoes.at(0)).c_str();
-        const char *aux2 = (valorDimensoes.at(0)).c_str();
-        const char *aux3 = (valorDimensoes.at(1)).c_str();
-        
-        return atoi(aux1) * atoi(aux2) + atoi(aux3);
+    {      
+        return dimensoes.at(0) + "*" + valorDimensoes.at(0) + " + " + valorDimensoes.at(1);
     }
     
-    const char *aux = (valorDimensoes.at(0)).c_str();
-    return atoi(aux);
+    return valorFinal;
 }
 
 string gerarDeclaracaoVariaveisGlobais()

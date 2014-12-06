@@ -27,9 +27,9 @@ ID      {LETRA}({LETRA}|{NUMERO})*
     "if"       { yylval = Atributo( yytext ); return _TK_IF; }
     "else"     { yylval = Atributo( yytext ); return _TK_ELSE; }
     "for"      { string fimLoop = gerarLabel("fim_for"); yylval = Atributo( yytext, "", "", fimLoop); return _TK_FOR; }
-    "do"       { string fimLoop = gerarLabel("fim_dowhile"); yylval = Atributo( yytext, "", "", fimLoop); return _TK_DO; }
     "while"    { string fimLoop = gerarLabel("fim_while"); yylval = Atributo( yytext, "", "", fimLoop); return _TK_WHILE; }
-    "switch"   { yylval = Atributo( yytext ); return _TK_SWITCH; }
+    "switch"   { string fimLoop = gerarLabel("fim_switch"); yylval = Atributo( yytext, "", "", fimLoop); return _TK_SWITCH;  }
+    "do"       { string fimLoop = gerarLabel("fim_dowhile"); yylval = Atributo( yytext, "", "", fimLoop); return _TK_DO; }
     "case"     { yylval = Atributo( yytext ); return _TK_CASE; }
     "break"    { yylval = Atributo( yytext ); return _TK_BREAK; }
     "default"  { yylval = Atributo( yytext ); return _TK_DEFAULT; }
