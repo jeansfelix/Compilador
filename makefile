@@ -1,5 +1,7 @@
-all: gerarSaida saida
-	gcc -o saida saida.c -Wall
+all: compilarSaida
+
+compilarSaida: gerarSaida
+	gcc -o saida saida.c -lm -Wall
 
 gerarSaida: trabalho entrada.cc
 	./jr < entrada.cc > saida.c

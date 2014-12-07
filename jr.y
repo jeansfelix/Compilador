@@ -18,24 +18,29 @@ const int MAX_STRING = 256;
 *   Utilizo tamanhos tanto para guardar os valores do indice de uma matriz
 *   como para guardar os valores do tamanho de linha e coluna de uma matriz.
 */
-struct Tipo {
+struct Tipo 
+{
   string nome;
   vector<string> tamanhos;
   
   Tipo() {}
-  Tipo(string nome) {
+  Tipo(string nome) 
+  {
     this->nome = nome;
   }
 };
 
-struct Atributo {
+struct Atributo 
+{
   string v;  // Valor
   Tipo t;    // Tipo
   string c;  // Codigo
+  string nomeFunc;
   string fimLoop;
   
   Atributo() {}  // inicializacao automatica para vazio ""
-  Atributo( string v, string t = "", string c = "", string fimLoop = "") {
+  Atributo( string v, string t = "", string c = "", string fimLoop = "", string nomeFunc = "") 
+  {
     this->v = v;
     this->t.nome = t;
     this->c = c;
@@ -45,11 +50,11 @@ struct Atributo {
 
 typedef map< string, Tipo > TS;
 typedef map< string, Tipo > TipoRetorno;
-typedef map< string, TS > FunctionScopes;
+typedef map< string, TS > EscopoFuncoes;
 typedef map< string, Tipo > Argumentos;
 
 TS tsGlobais;
-FunctionScopes fs;
+EscopoFuncoes escFunc;
 Argumentos args;
 TipoRetorno tipoRetorno;
 
@@ -62,17 +67,22 @@ string gerarLabel(string cmd);
 string gerarTemp(Tipo tipo);
 
 void erro( string msg );
-
+void inicializarTipoRetorno();
+void inicializarEscFunc();
 void inicializarResultadoOperacao();
+
 Tipo tipoResultado( Tipo a, string operador, Tipo b );
 
 string gerarDeclaracaoVariaveisTemporarias();
 string gerarDeclaracaoVariaveisGlobais();
 string gerarDeclaracaoVariaveisLocais(string escopoFuncao);
 
+bool buscarFuncao(string nomeFunc);
 bool buscarVariavelTS( TS& ts, string nomeVar, Tipo* tipo );
 bool buscarVariavelTS( TS& ts, string nomeVar );
 bool verificarSeVariavelFoiDeclarada(string nomeVar);
+
+void gerarCodigoFuncao(Atributo *SS, Atributo& S1, Atributo& S3, Atributo& S5, Atributo& S6);
 
 void gerarDeclaracaoVariavel(Atributo* SS, const Atributo& tipo, const Atributo& id );
 void gerarDeclaracaoVariavelArray(Atributo* SS, const Atributo& tipo, const Atributo& id, const Atributo& array );
@@ -83,7 +93,8 @@ void inserirVariavelTS( string nomeVar, Tipo tipo );
 
 void gerarCodigo_F_para_TK_ID(Atributo *atr, const Atributo& id);
 void gerarCodigo_F_para_TK_ID_ARRAY(Atributo *atr, const Atributo& id, const Atributo& index);
-string calcularIndice(vector<string> valorDimensoes, vector<string> dimensoes);
+void gerarCodigo_F_para_TK_ID_FUNC(Atributo *atr, const Atributo& id);
+string calcularIndice(vector<string> valorDimensoes, vector<string> dimensoes, string *temp);
 
 void gerarCodigoIf(Atributo *SS, Atributo exp_if, Atributo bloco_if);
 void gerarCodigoIfElse(Atributo *SS, Atributo exp_if, Atributo bloco_if, Atributo bloco_else);
@@ -98,6 +109,8 @@ void gerarCodigoCase(Atributo *SS, Atributo& teste, Atributo& bloco);
 
 void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo operador, Atributo atr2);
 void gerarCodAux_Int_String(string *atr1Value, string *atr2Value, string *cod_aux, string *cod_free, Tipo atr1_t, Tipo atr2_t);
+
+void gerarCodigo_EXP_BOOL(Atributo *atr, Atributo atr1 , Atributo operador, Atributo atr2);
 
 void gerarCodigo_EXP_UNARIA(Atributo *atr, Atributo atr1 , Atributo atr2);
 
@@ -114,7 +127,7 @@ void yyerror(const char *);
 %token _C_INT _C_CHAR _C_DOUBLE _C_STRING _C_BOOL _C_FLOAT
 %token _TK_ID _TK_IF _TK_ELSE _TK_FOR _TK_WHILE _TK_DO _TK_SWITCH _TK_CASE _TK_BREAK _TK_DEFAULT _TK_RETURN
 %token _TK_INT _TK_CHAR _TK_DOUBLE _TK_STRING _TK_BOOL _TK_FLOAT _TK_VOID
-%token _OP_NOT _OP_EQUAL _OP_DIF _OP_LESS_OR_EQUAL _OP_GREATER_OR_EQUAL _OP_INC _OP_DEC _OP_OR _OP_AND
+%token _OP_NOT _OP_EQUAL _OP_DIF _OP_LESS_OR_EQUAL _OP_GREATER_OR_EQUAL _OP_OR _OP_AND
 %token _IO_PRINT _IO_SCAN
 
 %nonassoc _PRECEDENCIA_ELSE
@@ -132,6 +145,7 @@ void yyerror(const char *);
 
 S0 : GLOBAL_VAR { cout << "#include <stdio.h>\n"
                           "#include <stdlib.h>\n"
+                          "#include <math.h>\n"
                           "#include <string.h>\n\n"
                        << gerarDeclaracaoVariaveisTemporarias() << gerarDeclaracaoVariaveisGlobais() + "\n" << $1.c << endl; }
    ;
@@ -144,14 +158,8 @@ GLOBAL_VAR : VAR_ARRAY ';' GLOBAL_VAR
                     {$$.c = $1.c;}
            ;
 
-
-
 FUNCOES : TIPO_NOME_FUNC '(' ARGUMENTOS ')' BLOCO FUNCOES
-                    {
-                        $$.c = $1.t.nome + " " + $1.v + "(" + $3.c + ")" 
-                        + "\n{\n" + gerarDeclaracaoVariaveisLocais($1.v) + "\n" + $5.c + "}\n\n" + $6.c; 
-                        
-                    }
+                    { gerarCodigoFuncao(&$$, $1, $3, $5, $6); }
          | /* epsylon */
                     { $$.c = ""; }
          ;
@@ -232,8 +240,16 @@ COMANDO : CMD_IF
 
 CMD_RETURN : _TK_RETURN EXP ';'
                 {
-                    string temp = gerarTemp($2.t);
-                    $$.c = $2.c + "    " + temp + " = " + $2.v + ";\n    return " + temp + ";\n";
+                    if ($2.t.nome != "string") 
+                    {
+                        string temp = gerarTemp($2.t);
+                        $$.c = $2.c + "    " + temp + " = " + $2.v + ";\n    return " + temp + ";\n";
+                    }
+                    else 
+                    {
+                        $$.c = $2.c + "    return " + $2.v + ";\n";
+                    }
+                    
                 }
            | _TK_RETURN ';'
                 {$$.c = "    " + $1.v + ";\n";}
@@ -322,10 +338,10 @@ ARRAY : ARRAY '[' _C_INT ']'
              { $$.c = ""; $$.t.tamanhos.push_back($2.v); }
       ;
       
-INDICE : INDICE ',' F
-             { $$.c = ""; $$.t.tamanhos = $1.t.tamanhos; $$.t.tamanhos.push_back($3.v); }
-       | F
-             { $$.c = ""; $$.t.tamanhos.push_back($1.v); }
+INDICE : INDICE ',' EXP
+             { $$.c = $1.c + $3.c; $$.t.tamanhos = $1.t.tamanhos; $$.t.tamanhos.push_back($3.v); }
+       | EXP
+             { $$.c = $1.c; $$.t.tamanhos.push_back($1.v); }
        ;
 
 VAR : VAR ',' _TK_ID
@@ -356,6 +372,7 @@ CHAMA_FUNC : _TK_ID '(' PARAMETROS ')'
 	          }
 	          parametros += $3.t.tamanhos.at(i);
 	          
+	          $$.nomeFunc = $1.v;
               $$.v = $1.v + "(" + parametros + ")";
               $$.t = tipoRetorno[$1.v];
               
@@ -383,24 +400,28 @@ EXP : EXP '+' EXP
     | EXP '<' EXP  
             { gerarCodigo_EXP(&$$, $1 , $2, $3); }
     | EXP _OP_EQUAL EXP  
-            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+            { gerarCodigo_EXP_BOOL(&$$, $1 , $2, $3); }
     | EXP _OP_DIF EXP  
-            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+            { gerarCodigo_EXP_BOOL(&$$, $1 , $2, $3); }
     | EXP _OP_LESS_OR_EQUAL EXP
-            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+            { gerarCodigo_EXP_BOOL(&$$, $1 , $2, $3); }
     | EXP _OP_GREATER_OR_EQUAL EXP  
-            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+            { gerarCodigo_EXP_BOOL(&$$, $1 , $2, $3); }
     | EXP _OP_OR EXP  
-            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+            { gerarCodigo_EXP_BOOL(&$$, $1 , $2, $3); }
     | EXP _OP_AND EXP  
-            { gerarCodigo_EXP(&$$, $1 , $2, $3); }
+            { gerarCodigo_EXP_BOOL(&$$, $1 , $2, $3); }
     | EXP_UNARIA
-            { $$.c = $1.c; }
+            { $$ = $1; }            
     | F
-        {$$ = $1;}
+            {$$ = $1;}
     ;
            
-EXP_UNARIA : _OP_INC EXP
+EXP_UNARIA : '+' EXP
+                { gerarCodigo_EXP_UNARIA(&$$, $1, $2); }
+           | '-' EXP
+                { gerarCodigo_EXP_UNARIA(&$$, $1, $2); }
+           | _OP_INC EXP
                 { gerarCodigo_EXP_UNARIA(&$$, $1, $2); }
            | _OP_DEC EXP
                 { gerarCodigo_EXP_UNARIA(&$$, $1, $2); }
@@ -415,7 +436,7 @@ F : _TK_ID       { gerarCodigo_F_para_TK_ID(&$$, $1); }
   | _C_STRING    { $$ = $1; }
   | _C_FLOAT     { $$ = $1; }
   | '(' EXP ')'  { $$ = $2; }
-  | CHAMA_FUNC   { $$ = $1; }
+  | CHAMA_FUNC   { gerarCodigo_F_para_TK_ID_FUNC(&$$, $1); }
   | _TK_ID '[' INDICE ']'
                  { gerarCodigo_F_para_TK_ID_ARRAY(&$$, $1, $3); }
   ;
@@ -457,6 +478,20 @@ Tipo tipoResultado( Tipo a, string operador, Tipo b )
   return resultadoOperacao[a.nome + operador + b.nome];
 }
 
+
+void gerarCodigoFuncao(Atributo *SS, Atributo& S1, Atributo& S3, Atributo& S5, Atributo& S6) 
+{
+    if (S1.t.nome == "string") 
+    {
+         SS->c = "char* " + S1.v + "(" + S3.c + ")" 
+               + "\n{\n" + gerarDeclaracaoVariaveisLocais(S1.v) + "\n" + S5.c + "}\n\n" + S6.c; 
+         return;
+    }
+
+    SS->c = S1.t.nome + " " + S1.v + "(" + S3.c + ")" 
+            + "\n{\n" + gerarDeclaracaoVariaveisLocais(S1.v) + "\n" + S5.c + "}\n\n" + S6.c; 
+}
+
 void gerarCodigoIf(Atributo *SS, Atributo exp_if, Atributo bloco_if)
 {
     string label_if_false = gerarLabel("if_false"); 
@@ -483,12 +518,10 @@ string gerarCodigoBreak()
     
     codigoBreak = "    goto " + fimLoop + ";\n";
     
-    
     if (! (fimLoop.find("switch") != string::npos)) 
     {        
         pilhaFimLoop.pop_back();
     }
-    
     
     return codigoBreak;
 }
@@ -530,6 +563,11 @@ void gerarCodigoWhile(Atributo *SS, const string fim_while, const Atributo& cond
             + "    " + valorNotCond + " = !" + condicao.v + ";\n" 
             + "    if ( " + valorNotCond + " ) goto " + fim_while +";\n"
             + bloco_while.c + "    goto " + whileCond + ";\n" + fim_while + ":\n";
+    
+    if (!pilhaFimLoop.empty() && pilhaFimLoop.back() == fim_while) 
+    {
+        pilhaFimLoop.pop_back();
+    }
 }
 
 /**
@@ -550,6 +588,11 @@ void gerarCodigoDoWhile(Atributo *SS, const string fim_dowhile, const Atributo& 
             + bloco_while.c 
             + "    if ( !" + valorNotCond + " ) goto " + whileCond + ";\n"
             + fim_dowhile + ":\n";
+            
+    if (!pilhaFimLoop.empty() && fim_dowhile == pilhaFimLoop.back()) 
+    {
+        pilhaFimLoop.pop_back();
+    }
 }
 
 /**
@@ -558,20 +601,25 @@ void gerarCodigoDoWhile(Atributo *SS, const string fim_dowhile, const Atributo& 
 **/
 void gerarCodigoFor( Atributo* SS, const string fim_for, const Atributo& inicial, const Atributo& condicao, const Atributo& passo, const Atributo& cmds )
 {
-  string forCond = gerarLabel( "for_cond" );
-  string valorNotCond = gerarTemp( Tipo( "boolean" ) );
+    string forCond = gerarLabel( "for_cond" );
+    string valorNotCond = gerarTemp( Tipo( "boolean" ) );
          
-  if( condicao.t.nome != "boolean" )
+    if( condicao.t.nome != "boolean" )
     erro( "A expressão de teste deve ser booleana: " + condicao.t.nome ); 
-  
-  // Funciona apenas para filtro, sem pipe que precisa de buffer 
-  // (sort, por exemplo, não funciona)
-  SS->c = inicial.c + forCond + ":\n" + condicao.c
+
+    // Funciona apenas para filtro, sem pipe que precisa de buffer 
+    // (sort, por exemplo, não funciona)
+    SS->c = inicial.c + forCond + ":\n" + condicao.c
           + "    " + valorNotCond + " = !" + condicao.v + ";\n"
           + "    if( " + valorNotCond + " ) goto " + fim_for + ";\n"
           + cmds.c + passo.c 
           + "    goto " + forCond + ";\n"
           + fim_for + ":\n";
+          
+    if (!pilhaFimLoop.empty() && fim_for == pilhaFimLoop.back()) 
+    {
+        pilhaFimLoop.pop_back();
+    }
 }
 
 /**
@@ -580,6 +628,11 @@ void gerarCodigoFor( Atributo* SS, const string fim_for, const Atributo& inicial
 void gerarCodigoSwitch(Atributo *SS, string fimLoop, Atributo& cases)
 {
     SS->c = cases.c + fimLoop + ":\n";
+    
+    if (!pilhaFimLoop.empty() && fimLoop == pilhaFimLoop.back()) 
+    {
+        pilhaFimLoop.pop_back();
+    }
 }
 
 void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, Atributo S3)
@@ -587,7 +640,7 @@ void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, Atributo S3)
     bool varEhGlobal = buscarVariavelTS( tsGlobais, S1->v);
     bool varEhArgs = buscarVariavelTS(args, S1->v);
 
-    if (!varEhGlobal && !buscarVariavelTS(fs[scope], S1->v) && !varEhArgs)
+    if (!varEhGlobal && !buscarVariavelTS(escFunc[scope], S1->v) && !varEhArgs)
     {
          erro( "Variavel nao declarada: " + S1->v );
     }
@@ -602,10 +655,10 @@ void gerarCodigo_Atribuicao(Atributo *SS, Atributo *S1, Atributo S3)
     }
     else
     {
-        S1->t = fs[scope][S1->v];
+        S1->t = escFunc[scope][S1->v];
     }
 
-    if (S1->t.nome == S3.t.nome )
+    if (S1->t.nome == S3.t.nome || (S3.t.nome == "double" && S1->t.nome == "float"))
     {
         string max = toStr(MAX_STRING - 1);
     
@@ -634,7 +687,7 @@ void gerarCodigo_AtribuicaoArray(Atributo *SS, Atributo *S1, Atributo S3, Atribu
     bool varEhGlobal = buscarVariavelTS( tsGlobais, S1->v);
     bool varEhArgs = buscarVariavelTS(args, S1->v);
 
-    if (!varEhGlobal && !buscarVariavelTS(fs[scope], S1->v) && !varEhArgs)
+    if (!varEhGlobal && !buscarVariavelTS(escFunc[scope], S1->v) && !varEhArgs)
     {
          erro( "Variavel nao declarada: " + S1->v );
     }
@@ -649,16 +702,18 @@ void gerarCodigo_AtribuicaoArray(Atributo *SS, Atributo *S1, Atributo S3, Atribu
     }
     else
     {
-        S1->t = fs[scope][S1->v];
+        S1->t = escFunc[scope][S1->v];
     }
 
     if (S1->t.nome == S6.t.nome )
     {
-        string temp = gerarTemp(Tipo("int"));
+        string tempIndice = gerarTemp(Tipo("int"));
+        string tempExp    =  gerarTemp(Tipo("int"));
 
-        SS->c = S6.c + S3.c + "    " + temp + " = " + calcularIndice(S3.t.tamanhos, S3.t.tamanhos) 
-               + ";\n    " + S1->v + "[" + temp + "]" 
-               + " = " + S6.v + ";\n";
+        SS->c = S6.c + S3.c + calcularIndice(S3.t.tamanhos, S1->t.tamanhos, &tempIndice) 
+               + "    " + tempExp + " = " + S6.v + ";\n";
+
+        SS->c += "    " + SS->v + "[" + tempIndice + "]" + " = " + tempExp + ";\n";
     }
     else
     {
@@ -669,7 +724,20 @@ void gerarCodigo_AtribuicaoArray(Atributo *SS, Atributo *S1, Atributo S3, Atribu
 void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo operador, Atributo atr2)
 {
     atr->t = tipoResultado( atr1.t, operador.v, atr2.t );
-    
+
+    if (buscarFuncao(atr1.nomeFunc) || buscarFuncao(atr2.nomeFunc)) 
+    {
+        string temp1 = gerarTemp(atr1.v);
+        string temp2 = gerarTemp(atr1.v);
+        
+        atr->v = gerarTemp(atr->t);
+        
+        atr->c = "    " + temp1 + " = " + atr1.v + ";\n"
+                 "    " + temp2 + " = " + atr2.v + ";\n";
+                 
+        atr->c = atr1.c + atr2.c + atr->c + "    " + atr->v + " = " + atr1.v + " " + operador.v + " " + atr2.v + ";\n";
+    }
+
     if (atr->t.nome == "string") 
     {
         string atr1Value;
@@ -699,10 +767,39 @@ void gerarCodigo_EXP(Atributo *atr, Atributo atr1 , Atributo operador, Atributo 
                                  + "    " + temp + "[" + toStr(MAX_STRING - 1) + "] = 0;\n"
                                  + "    " + tamCopia + " = " + "strlen(" + atr1Value + ");\n"
                                  + "    " + temTamCopia + " = " + toStr(MAX_STRING - 1) + " - " + tamCopia + ";\n"
+                                 +
                                  + "    strncat( " + temp + ", " + atr2Value + ", " + temTamCopia + ");\n"
                                  + "    strncpy(" + atr->v + ", " + temp + ", " + toStr(MAX_STRING - 1) + ");\n" 
                                  + "    " + atr->v + "[" + toStr(MAX_STRING - 1) + "] = 0;\n"
                                  ;
+        return;
+    }
+
+    atr->v = gerarTemp(atr->t);
+    atr->c = atr1.c + atr2.c + "    " + atr->v + " = " + atr1.v + " " + operador.v + " " + atr2.v + ";\n";
+}
+
+void gerarCodigo_EXP_BOOL(Atributo *atr, Atributo atr1 , Atributo operador, Atributo atr2)
+{
+    atr->t = tipoResultado( atr1.t, operador.v, atr2.t );
+    
+    if (atr1.t.nome == "string" && atr2.t.nome == "string" && operador.v == "==" ) 
+    {        
+        string aux = gerarTemp(atr->t);
+        atr->v = gerarTemp(atr->t);
+        
+        atr->c = atr1.c + atr2.c + "    " + aux + " = strcmp(" + atr1.v + ", " + atr2.v + ");\n"
+                                 + "    " + atr->v + " = !" + aux + ";\n";
+        
+        return;
+    }
+    
+    if (atr1.t.nome == "string" && atr2.t.nome == "string" && operador.v == "!=" ) 
+    {        
+        atr->v = gerarTemp(atr->t);
+        
+        atr->c = atr1.c + atr2.c + "    " + atr->v + " = strcmp(" + atr1.v + ", " + atr2.v + ");\n";
+        
         return;
     }
     
@@ -729,6 +826,27 @@ void gerarCodAux_Int_String(string *atr1Value, string *atr2Value, string *cod_au
         *atr1Value = temp_atr1;
         *cod_free = "    free(" + temp_atr1 + ");\n";
     }
+    
+    if ( atr1_t.nome == "double" && atr2_t.nome == "string" )
+    {
+        string temp_atr1;
+        string temp_atr2;
+        
+        temp_atr1 = gerarTemp(Tipo("string"));
+        *cod_aux = "    sprintf(" + temp_atr1 + ",\"%lf\", " + *atr1Value + ");\n";
+        *atr1Value = temp_atr1;
+        *cod_free = "    free(" + temp_atr1 + ");\n";
+    }
+}
+
+bool buscarFuncao(string nomeFunc)
+{
+  if( escFunc.find( nomeFunc ) != escFunc.end() )
+  {
+    return true;
+  }
+  else
+    return false;
 }
 
 bool buscarVariavelTS( TS& ts, string nomeVar, Tipo* tipo )
@@ -794,9 +912,9 @@ void inserirVariavelTS(string nomeVar, Tipo tipo )
         }
     }
 
-    if( !buscarVariavelTS( tsGlobais, nomeVar, &tipo ) && !buscarVariavelTS(fs[scope], nomeVar, &tipo))
+    if( !buscarVariavelTS( tsGlobais, nomeVar, &tipo ) && !buscarVariavelTS(escFunc[scope], nomeVar, &tipo))
     {
-        fs[scope][nomeVar] = tipo;
+        escFunc[scope][nomeVar] = tipo;
     }
     else
     {
@@ -806,7 +924,7 @@ void inserirVariavelTS(string nomeVar, Tipo tipo )
 
 bool verificarSeVariavelFoiDeclarada(string nomeVar)
 {
-    if( buscarVariavelTS( tsGlobais, nomeVar) || buscarVariavelTS(fs[scope], nomeVar) )
+    if( buscarVariavelTS( tsGlobais, nomeVar) || buscarVariavelTS(escFunc[scope], nomeVar) )
     {
         return true;
     }
@@ -829,10 +947,10 @@ void gerarCodigo_F_para_TK_ID(Atributo *atr, const Atributo& id)
         return;
     }
 
-    if( buscarVariavelTS(fs[scope], id.v) )
+    if( buscarVariavelTS(escFunc[scope], id.v) )
     {
         atr->v = id.v;
-        atr->t = fs[scope][atr->v];
+        atr->t = escFunc[scope][atr->v];
         return;
     }
     erro( "Variavel nao declarada: " + id.v );
@@ -842,6 +960,8 @@ void gerarCodigo_F_para_TK_ID_ARRAY(Atributo *atr, const Atributo& id, const Atr
 {
     atr->c = index.c;
     
+    string temp = gerarTemp(Tipo("int"));
+    
     if (index.t.nome != "int") 
     {
         erro("Passando índice não inteiro: " + index.v);
@@ -850,43 +970,81 @@ void gerarCodigo_F_para_TK_ID_ARRAY(Atributo *atr, const Atributo& id, const Atr
     if (buscarVariavelTS(args, id.v))
     {
         atr->t = args[atr->v];
+        string tempValor = gerarTemp(Tipo(atr->t.nome));
         
-        string aux = calcularIndice(index.t.tamanhos, atr->t.tamanhos);
+        string aux = calcularIndice(index.t.tamanhos, atr->t.tamanhos, &temp);
         
-        atr->v = " " + id.v + "[" + aux + "]";
+        atr->c += aux;
+        atr->c += "    " + tempValor + " = " + id.v + "[" + temp + "];\n" ;
+        atr->v = tempValor;
         return;
     }
 
     if (buscarVariavelTS(tsGlobais, id.v))
     {
         atr->t = tsGlobais[atr->v];
+        string tempValor = gerarTemp(Tipo(atr->t.nome));
         
-        string aux = calcularIndice(index.t.tamanhos, atr->t.tamanhos);
+        string aux = calcularIndice(index.t.tamanhos, atr->t.tamanhos, &temp);
         
-        atr->v = " " + id.v + "[" + aux + "]";
+        atr->c += aux;
+        atr->c += "    " + tempValor + " = " + id.v + "[" + temp + "];\n" ;
+        atr->v = tempValor;
         return;
     }
 
-    if(buscarVariavelTS(fs[scope], id.v))
+    if(buscarVariavelTS(escFunc[scope], id.v))
     {
-        atr->t = fs[scope][atr->v];
+        atr->t = escFunc[scope][atr->v];
+        string tempValor = gerarTemp(Tipo(atr->t.nome));
         
-        string aux = calcularIndice(index.t.tamanhos, atr->t.tamanhos);
+        string aux = calcularIndice(index.t.tamanhos, atr->t.tamanhos, &temp);
         
-        atr->v = " " + id.v + "[" + aux + "]";
+        atr->c += aux;
+        atr->c += "    " + tempValor + " = " + id.v + "[" + temp + "];\n" ;
+        atr->v = tempValor;
         return;
     }
     erro( "Variavel nao declarada: " + id.v );
 }
 
-string calcularIndice(vector<string> valorDimensoes, vector<string> dimensoes)
+void gerarCodigo_F_para_TK_ID_FUNC(Atributo *atr, const Atributo& id)
+{   
+    atr->t = tipoRetorno[id.nomeFunc];
+    string tempValor = gerarTemp(atr->t);
+
+    if (atr->t.nome == "string") 
+    {
+        string temp1 = gerarTemp(Tipo("char_ptr"));
+        
+        atr->c = "    " + temp1 + " = " + id.v + ";\n";
+        atr->c += "    sprintf(" + tempValor + ",\"%s\", " + temp1 + ");\n";
+        atr->v = tempValor;
+        
+        return;
+    }
+    
+    atr->c = "    " + tempValor + " = " + id.v + ";\n";
+    atr->v = tempValor;
+    return;
+    
+
+    erro( "Função nao declarada: " + id.v );
+}
+
+string calcularIndice(vector<string> valorDimensoes, vector<string> dimensoes, string *temp)
 {
-    string valorFinal = "";
+    string valorFinal   =  "";
+    string numeroLinha  = dimensoes.at(0);
+    string indicelinha  = valorDimensoes.at(1);
+    string indiceColuna = valorDimensoes.at(0);
+    
     const int numeroDimensao = valorDimensoes.size();
 
     if (numeroDimensao == 2)
-    {      
-        return dimensoes.at(0) + "*" + valorDimensoes.at(0) + " + " + valorDimensoes.at(1);
+    {             
+        return "    " + *temp + " = " + numeroLinha + " * " + indicelinha  + ";\n" 
+             + "    " + *temp + " = " + *temp + " + " + indiceColuna + ";\n";
     }
     
     return valorFinal;
@@ -913,7 +1071,7 @@ string gerarDeclaracaoVariaveisGlobais()
 
 string gerarDeclaracaoVariaveisLocais(string escopoFuncao)
 {
-    TS ts = fs[escopoFuncao];
+    TS ts = escFunc[escopoFuncao];
     
     string c = "";
     
@@ -938,6 +1096,12 @@ string gerarDeclaracaoVariaveisLocais(string escopoFuncao)
         {
             c = c + "    char " + it->first + "["+ toStr( MAX_STRING ) +"];\n"; ;
             continue;        
+        }
+        
+        if (it->second.nome == "boolean")
+        {
+            c = c + "    int " + it->first + ";\n";
+            continue;
         }
         
         c = c + "    " + it->second.nome + " " + it->first + ";\n";
@@ -967,6 +1131,9 @@ string gerarDeclaracaoVariaveisTemporarias()
 
     for( int i = 0; i < n_var_temp["string"]; i++ )
         c += "char temp_string_" + toStr( i + 1 ) + "[" + toStr( MAX_STRING )+ "];\n";
+    
+    for( int i = 0; i < n_var_temp["char_ptr"]; i++ )
+        c += "char* temp_char_ptr_" + toStr( i + 1 ) + ";\n";
 
     return c;  
 }
@@ -984,14 +1151,24 @@ string gerarCodigoCMD_LEITURA(Atributo& id)
     {
         tipoId = tsGlobais[id.v];
     }
-    else if( buscarVariavelTS(fs[scope], id.v) )
+    else if( buscarVariavelTS(escFunc[scope], id.v) )
     {
-        tipoId = fs[scope][id.v];
+        tipoId = escFunc[scope][id.v];
     }
     
     if (tipoId.nome == "int") 
     {
         return "    scanf(\"%d\"," + aux + id.v + ");\n";
+    }
+    
+    if (tipoId.nome == "double") 
+    {
+        return "    scanf(\"%lf\"," + aux + id.v + ");\n";
+    }
+    
+    if (tipoId.nome == "float") 
+    {
+        return "    scanf(\"%f\"," + aux + id.v + ");\n";
     }
     
     if (tipoId.nome == "string") 
@@ -1015,33 +1192,101 @@ string gerarLabel(string cmd)
     return "LABEL_" + cmd + "_" + toStr( ++n_label[cmd] );
 }
 
+void inicializarEscFunc()
+{
+    TS aux;
+    
+    escFunc["sqrt"] = aux;
+    escFunc["sin"] = aux;
+    escFunc["cos"] = aux;
+    escFunc["tan"] = aux;
+    escFunc["sqrt"] = aux;
+    escFunc["log"] = aux;
+    escFunc["log10"] = aux;
+    escFunc["pow"] = aux;
+    escFunc["ceil"] = aux;
+    escFunc["floor"] = aux;
+}
+
+void inicializarTipoRetorno()
+{
+    tipoRetorno["sqrt"] = Tipo("double");
+    tipoRetorno["sin"] = Tipo("double");
+    tipoRetorno["cos"] = Tipo("double");
+    tipoRetorno["tan"] = Tipo("double");
+    tipoRetorno["sqrt"] = Tipo("double");
+    tipoRetorno["log"] = Tipo("double");
+    tipoRetorno["log10"] = Tipo("double");
+    tipoRetorno["pow"] = Tipo("double");
+    tipoRetorno["ceil"] = Tipo("float");
+    tipoRetorno["floor"] = Tipo("float");
+}
+
 void inicializarResultadoOperacao()
 {
-  resultadoOperacao["string+string"] = Tipo("string");
-  resultadoOperacao["string+int"] = Tipo("string");
-  resultadoOperacao["int+string"] = Tipo("string");
-  
-  resultadoOperacao["int+int"] = Tipo("int");
-  resultadoOperacao["int-int"] = Tipo("int");
-  resultadoOperacao["int*int"] = Tipo("int");
-  resultadoOperacao["int%int"] = Tipo("int");
-  resultadoOperacao["int/int"] = Tipo("int");
-  resultadoOperacao["++int"] = Tipo("int");
-  resultadoOperacao["--int"] = Tipo("int");
-  
-  resultadoOperacao["int==int"] = Tipo("boolean");
-  resultadoOperacao["int<int"] = Tipo("boolean");
-  resultadoOperacao["int>int"] = Tipo("boolean");
-  resultadoOperacao["int<=int"] = Tipo("boolean");
-  resultadoOperacao["int>=int"] = Tipo("boolean");
-  resultadoOperacao["!boolean"] = Tipo("boolean");
-  
-  resultadoOperacao["double+int"] = Tipo("double");
-  resultadoOperacao["int*double"] = Tipo("double");
+    resultadoOperacao["string+string"] = Tipo("string");
+    
+    resultadoOperacao["string+int"] = Tipo("string");
+    resultadoOperacao["string+double"] = Tipo("string");
+    
+    resultadoOperacao["int+string"] = Tipo("string");
+    resultadoOperacao["double+string"] = Tipo("string");
+
+    resultadoOperacao["int+int"] = Tipo("int");
+    resultadoOperacao["int-int"] = Tipo("int");
+    resultadoOperacao["int*int"] = Tipo("int");
+    resultadoOperacao["int%int"] = Tipo("int");
+    resultadoOperacao["int/int"] = Tipo("int");
+    resultadoOperacao["+int"] = Tipo("int");
+    resultadoOperacao["-int"] = Tipo("int");
+
+    resultadoOperacao["int==int"] = Tipo("boolean");
+    resultadoOperacao["int!=int"] = Tipo("boolean");
+    resultadoOperacao["int<int"] = Tipo("boolean");
+    resultadoOperacao["int>int"] = Tipo("boolean");
+    resultadoOperacao["int<=int"] = Tipo("boolean");
+    resultadoOperacao["int>=int"] = Tipo("boolean");
+
+    resultadoOperacao["string==string"] = Tipo("boolean");
+    resultadoOperacao["string!=string"] = Tipo("boolean");
+    resultadoOperacao["string>string"] = Tipo("boolean");
+    resultadoOperacao["string<string"] = Tipo("boolean");
+
+    resultadoOperacao["boolean==boolean"] = Tipo("boolean");
+    resultadoOperacao["boolean&&boolean"] = Tipo("boolean");
+    resultadoOperacao["boolean||boolean"] = Tipo("boolean");
+    resultadoOperacao["boolean!=boolean"] = Tipo("boolean");
+    resultadoOperacao["!boolean"] = Tipo("boolean");
+
+    resultadoOperacao["double==double"] = Tipo("boolean");
+    resultadoOperacao["double!=double"] = Tipo("boolean");
+    resultadoOperacao["double>=double"] = Tipo("boolean");
+    resultadoOperacao["double<=double"] = Tipo("boolean");
+    resultadoOperacao["double>double"] = Tipo("boolean");
+    resultadoOperacao["double<double"] = Tipo("boolean");
+
+    resultadoOperacao["double+double"] = Tipo("double");
+    resultadoOperacao["double-double"] = Tipo("double");
+    resultadoOperacao["double*double"] = Tipo("double");
+    resultadoOperacao["double/double"] = Tipo("double");
+    resultadoOperacao["-double"] = Tipo("double");
+    resultadoOperacao["+double"] = Tipo("double");
+
+    resultadoOperacao["int+double"] = Tipo("double");
+    resultadoOperacao["int*double"] = Tipo("double");
+    resultadoOperacao["int-double"] = Tipo("double");
+    resultadoOperacao["int/double"] = Tipo("double");
+
+    resultadoOperacao["double+int"] = Tipo("double");
+    resultadoOperacao["double*int"] = Tipo("double");
+    resultadoOperacao["double-int"] = Tipo("double");
+    resultadoOperacao["double/int"] = Tipo("double");
 }
 
 int main( int argc, char* argv[] )
 {
+    inicializarEscFunc();
+    inicializarTipoRetorno();
     inicializarResultadoOperacao();
     yyparse();
 }
